@@ -1,6 +1,5 @@
 plugins {
     id 'com.android.application'
-    id 'kotlin-parcelize'
     id 'androidx.navigation.safeargs.kotlin'
 }
 
@@ -46,8 +45,13 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.11.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.11.0'
 
-    implementation 'androidx.navigation:navigation-fragment-ktx:2.10.1'
-    implementation 'androidx.navigation:navigation-ui-ktx:2.10.1'
+    // このプロジェクトではminSdk 23としており、2.10.1ではassembleDebugが失敗する。
+    // 2.9.8はAARのAndroidManifestでminSdkVersion=21を確認済みのため、
+    // minSdk 23を維持できる最新版としてバージョンを固定。
+    // noinspection GradleDependency
+    implementation 'androidx.navigation:navigation-fragment-ktx:2.9.8'
+    // noinspection GradleDependency
+    implementation 'androidx.navigation:navigation-ui-ktx:2.9.8'
 
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
     implementation 'io.ktor:ktor-client-android:3.5.2'
