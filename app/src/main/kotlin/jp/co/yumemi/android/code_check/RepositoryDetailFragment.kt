@@ -23,7 +23,7 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
 
     private var _binding: FragmentRepositoryDetailBinding? = null
 
-    val binding get() = _binding!!
+    private val binding get() = _binding!!
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -32,7 +32,7 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
 
         _binding = FragmentRepositoryDetailBinding.bind(view)
 
-        var item = args.repositoryItem
+        val item = args.repositoryItem
 
         binding.ownerIcon.load(item.ownerAvatarUrl)
         binding.repositoryName.text = item.fullName

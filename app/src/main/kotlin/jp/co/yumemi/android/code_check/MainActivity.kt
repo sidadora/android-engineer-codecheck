@@ -17,16 +17,6 @@ import java.util.*
  */
 class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
-    companion object {
-        /**
-         * 最後に検索結果の変換が完了した日時。
-         *
-         * [RepositorySearchViewModel.searchRepositories]が更新し、未設定のまま参照すると例外になる。
-         * Todo : 上記例外は別Issueで対応
-         */
-        lateinit var lastSearchDate: Date
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -38,5 +28,15 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
             view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+    }
+
+    companion object {
+        /**
+         * 最後に検索結果の変換が完了した日時。
+         *
+         * [RepositorySearchViewModel.searchRepositories]が更新し、未設定のまま参照すると例外になる。
+         * Todo : 上記例外は別Issueで対応
+         */
+        lateinit var lastSearchDate: Date
     }
 }

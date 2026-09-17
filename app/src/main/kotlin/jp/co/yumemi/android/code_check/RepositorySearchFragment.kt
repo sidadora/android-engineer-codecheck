@@ -43,13 +43,13 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
 
         binding.searchInputText
             .setOnEditorActionListener { editText, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
+                if (isSearchAction) {
                     adapter.submitList(
                         viewModel.searchRepositories(editText.text.toString())
                     )
-                    return@setOnEditorActionListener true
                 }
-                return@setOnEditorActionListener false
+                isSearchAction
             }
 
         binding.repositoryListView.also {
@@ -64,25 +64,10 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
      *
      * @param item 詳細画面に表示するリポジトリ
      */
-    fun navigateToRepositoryDetail(item: RepositoryItem) {
+    private fun navigateToRepositoryDetail(item: RepositoryItem) {
         val action = RepositorySearchFragmentDirections
             .actionRepositorySearchFragmentToRepositoryDetailFragment(repositoryItem = item)
         findNavController().navigate(action)
-    }
-}
-
-/**
- * [RepositoryListAdapter]が一覧の差分を判定するために使うコールバック。
- *
- * [RepositoryItem.fullName]が一致する項目を同一とみなし、内容の比較は全プロパティの等価性で行う。
- */
-val repositoryDiffCallback = object : DiffUtil.ItemCallback<RepositoryItem>() {
-    override fun areItemsTheSame(oldItem: RepositoryItem, newItem: RepositoryItem): Boolean {
-        return oldItem.fullName == newItem.fullName
-    }
-
-    override fun areContentsTheSame(oldItem: RepositoryItem, newItem: RepositoryItem): Boolean {
-        return oldItem == newItem
     }
 }
 
@@ -114,11 +99,29 @@ class RepositoryListAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
-        (holder.itemView.findViewById<View>(R.id.repository_name) as TextView).text =
-            item.fullName
+        holder.itemView.findViewById<TextView>(R.id.repository_name).text = item.fullName
 
         holder.itemView.setOnClickListener {
             itemClickListener.onItemClick(item)
+        }
+    }
+
+    companion object {
+        /**
+         * 一覧の差分を判定するために使うコールバック。
+         *
+         * [RepositoryItem.fullName]が一致する項目を同一とみなし、内容の比較は全プロパティの等価性で行う。
+         */
+        private val repositoryDiffCallback = object : DiffUtil.ItemCallback<RepositoryItem>() {
+            override fun areItemsTheSame(
+                oldItem: RepositoryItem,
+                newItem: RepositoryItem,
+            ): Boolean = oldItem.fullName == newItem.fullName
+
+            override fun areContentsTheSame(
+                oldItem: RepositoryItem,
+                newItem: RepositoryItem,
+            ): Boolean = oldItem == newItem
         }
     }
 }

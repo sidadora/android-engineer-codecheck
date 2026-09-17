@@ -25,7 +25,7 @@ import java.util.*
  * @property context 言語表示用の文字列リソースを取得するために使う
  */
 class RepositorySearchViewModel(
-    val context: Context
+    private val context: Context
 ) : ViewModel() {
 
     /**
@@ -56,36 +56,43 @@ class RepositorySearchViewModel(
             val repositories = mutableListOf<RepositoryItem>()
 
             for (i in 0 until jsonItems.length()) {
-                val jsonItem = jsonItems.optJSONObject(i)!!
-                val fullName = jsonItem.optString("full_name")
-                val ownerAvatarUrl =
-                    jsonItem.optJSONObject("owner")!!.optString("avatar_url")
-                val language = jsonItem.optString("language")
-                val stargazersCount = jsonItem.optLong("stargazers_count")
-                val watchersCount = jsonItem.optLong("watchers_count")
-                val forksCount = jsonItem.optLong("forks_conut")
-                val openIssuesCount = jsonItem.optLong("open_issues_count")
-
-                repositories.add(
-                    RepositoryItem(
-                        fullName = fullName,
-                        ownerAvatarUrl = ownerAvatarUrl,
-                        languageText = context.getString(
-                            R.string.repository_language_format,
-                            language
-                        ),
-                        stargazersCount = stargazersCount,
-                        watchersCount = watchersCount,
-                        forksCount = forksCount,
-                        openIssuesCount = openIssuesCount
-                    )
-                )
+                repositories.add(toRepositoryItem(jsonItems.optJSONObject(i)!!))
             }
 
             lastSearchDate = Date()
 
             return@async repositories.toList()
         }.await()
+    }
+
+    /**
+     * 検索結果1件分のJSONを、表示用の[RepositoryItem]に変換する。
+     *
+     * @param jsonItem リポジトリ検索APIのレスポンス内、`items`配列の1要素
+     * @return 画面表示に使う1件分のリポジトリ情報
+     */
+    private fun toRepositoryItem(jsonItem: JSONObject): RepositoryItem {
+        val fullName = jsonItem.optString("full_name")
+        val ownerAvatarUrl =
+            jsonItem.optJSONObject("owner")!!.optString("avatar_url")
+        val language = jsonItem.optString("language")
+        val stargazersCount = jsonItem.optLong("stargazers_count")
+        val watchersCount = jsonItem.optLong("watchers_count")
+        val forksCount = jsonItem.optLong("forks_conut")
+        val openIssuesCount = jsonItem.optLong("open_issues_count")
+
+        return RepositoryItem(
+            fullName = fullName,
+            ownerAvatarUrl = ownerAvatarUrl,
+            languageText = context.getString(
+                R.string.repository_language_format,
+                language
+            ),
+            stargazersCount = stargazersCount,
+            watchersCount = watchersCount,
+            forksCount = forksCount,
+            openIssuesCount = openIssuesCount
+        )
     }
 }
 
