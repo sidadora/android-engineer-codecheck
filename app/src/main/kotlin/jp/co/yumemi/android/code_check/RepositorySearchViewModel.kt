@@ -7,17 +7,19 @@ import android.content.Context
 import android.os.Parcel
 import android.os.Parcelable
 import androidx.lifecycle.ViewModel
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.android.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.android.Android
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.statement.HttpResponse
 import jp.co.yumemi.android.code_check.MainActivity.Companion.lastSearchDate
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
-import java.util.*
+import java.util.Date
 
 /**
  * GitHubのリポジトリ検索APIを呼び出し、画面表示用の[RepositoryItem]に変換する。
@@ -25,9 +27,8 @@ import java.util.*
  * @property context 言語表示用の文字列リソースを取得するために使う
  */
 class RepositorySearchViewModel(
-    private val context: Context
+    private val context: Context,
 ) : ViewModel() {
-
     /**
      * [query]でGitHubのリポジトリを検索し、表示用の一覧を返す。
      *
@@ -38,32 +39,35 @@ class RepositorySearchViewModel(
      * @param query GitHubのリポジトリ検索APIの`q`パラメータに渡す検索条件
      * @return APIが返した順序のままの検索結果。該当がなければ空のリスト
      */
-    fun searchRepositories(query: String): List<RepositoryItem> = runBlocking {
-        val client = HttpClient(Android)
+    fun searchRepositories(query: String): List<RepositoryItem> =
+        runBlocking {
+            val client = HttpClient(Android)
 
-        return@runBlocking GlobalScope.async {
-            val response: HttpResponse = client.get(
-                "https://api.github.com/search/repositories"
-            ) {
-                header("Accept", "application/vnd.github.v3+json")
-                parameter("q", query)
-            }
+            return@runBlocking GlobalScope
+                .async {
+                    val response: HttpResponse =
+                        client.get(
+                            "https://api.github.com/search/repositories",
+                        ) {
+                            header("Accept", "application/vnd.github.v3+json")
+                            parameter("q", query)
+                        }
 
-            val jsonBody = JSONObject(response.body<String>())
+                    val jsonBody = JSONObject(response.body<String>())
 
-            val jsonItems = jsonBody.optJSONArray("items")!!
+                    val jsonItems = jsonBody.optJSONArray("items")!!
 
-            val repositories = mutableListOf<RepositoryItem>()
+                    val repositories = mutableListOf<RepositoryItem>()
 
-            for (i in 0 until jsonItems.length()) {
-                repositories.add(toRepositoryItem(jsonItems.optJSONObject(i)!!))
-            }
+                    for (i in 0 until jsonItems.length()) {
+                        repositories.add(toRepositoryItem(jsonItems.optJSONObject(i)!!))
+                    }
 
-            lastSearchDate = Date()
+                    lastSearchDate = Date()
 
-            return@async repositories.toList()
-        }.await()
-    }
+                    return@async repositories.toList()
+                }.await()
+        }
 
     /**
      * 検索結果1件分のJSONを、表示用の[RepositoryItem]に変換する。
@@ -84,14 +88,15 @@ class RepositorySearchViewModel(
         return RepositoryItem(
             fullName = fullName,
             ownerAvatarUrl = ownerAvatarUrl,
-            languageText = context.getString(
-                R.string.repository_language_format,
-                language
-            ),
+            languageText =
+                context.getString(
+                    R.string.repository_language_format,
+                    language,
+                ),
             stargazersCount = stargazersCount,
             watchersCount = watchersCount,
             forksCount = forksCount,
-            openIssuesCount = openIssuesCount
+            openIssuesCount = openIssuesCount,
         )
     }
 }
@@ -137,7 +142,10 @@ data class RepositoryItem(
         openIssuesCount = parcel.readLong(),
     )
 
-    override fun writeToParcel(parcel: Parcel, flags: Int) {
+    override fun writeToParcel(
+        parcel: Parcel,
+        flags: Int,
+    ) {
         parcel.writeString(fullName)
         parcel.writeString(ownerAvatarUrl)
         parcel.writeString(languageText)

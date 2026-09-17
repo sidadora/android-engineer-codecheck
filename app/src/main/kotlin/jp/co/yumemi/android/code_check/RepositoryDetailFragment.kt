@@ -18,19 +18,21 @@ import jp.co.yumemi.android.code_check.databinding.FragmentRepositoryDetailBindi
  * 表示するリポジトリはNavigationの引数`repositoryItem`で受け取る。
  */
 class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
-
     private val args: RepositoryDetailFragmentArgs by navArgs()
 
-    private var _binding: FragmentRepositoryDetailBinding? = null
+    private var viewBinding: FragmentRepositoryDetailBinding? = null
 
-    private val binding get() = _binding!!
+    private val binding get() = viewBinding!!
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
         super.onViewCreated(view, savedInstanceState)
 
         Log.d("検索した日時", lastSearchDate.toString())
 
-        _binding = FragmentRepositoryDetailBinding.bind(view)
+        viewBinding = FragmentRepositoryDetailBinding.bind(view)
 
         val item = args.repositoryItem
 
