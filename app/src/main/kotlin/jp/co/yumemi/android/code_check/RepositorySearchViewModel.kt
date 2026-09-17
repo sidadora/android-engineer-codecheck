@@ -31,7 +31,9 @@ class RepositorySearchViewModel(
         val client = HttpClient(Android)
 
         return@runBlocking GlobalScope.async {
-            val response: HttpResponse = client.get("https://api.github.com/search/repositories") {
+            val response: HttpResponse = client.get(
+                "https://api.github.com/search/repositories"
+            ) {
                 header("Accept", "application/vnd.github.v3+json")
                 parameter("q", query)
             }
@@ -48,7 +50,8 @@ class RepositorySearchViewModel(
             for (i in 0 until jsonItems.length()) {
                 val jsonItem = jsonItems.optJSONObject(i)!!
                 val fullName = jsonItem.optString("full_name")
-                val ownerAvatarUrl = jsonItem.optJSONObject("owner")!!.optString("avatar_url")
+                val ownerAvatarUrl =
+                    jsonItem.optJSONObject("owner")!!.optString("avatar_url")
                 val language = jsonItem.optString("language")
                 val stargazersCount = jsonItem.optLong("stargazers_count")
                 val watchersCount = jsonItem.optLong("watchers_count")
@@ -59,7 +62,10 @@ class RepositorySearchViewModel(
                     RepositoryItem(
                         fullName = fullName,
                         ownerAvatarUrl = ownerAvatarUrl,
-                        languageText = context.getString(R.string.repository_language_format, language),
+                        languageText = context.getString(
+                            R.string.repository_language_format,
+                            language
+                        ),
                         stargazersCount = stargazersCount,
                         watchersCount = watchersCount,
                         forksCount = forksCount,
