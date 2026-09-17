@@ -10,7 +10,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.util.*
 
-class TopActivity : AppCompatActivity(R.layout.activity_top) {
+class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
     companion object {
         lateinit var lastSearchDate: Date
