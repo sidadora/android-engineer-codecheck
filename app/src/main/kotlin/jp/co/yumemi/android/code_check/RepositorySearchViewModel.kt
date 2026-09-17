@@ -20,13 +20,24 @@ import org.json.JSONObject
 import java.util.*
 
 /**
- * RepositoryDetailFragment で使う
+ * GitHubのリポジトリ検索APIを呼び出し、画面表示用の[RepositoryItem]に変換する。
+ *
+ * @property context 言語表示用の文字列リソースを取得するために使う
  */
 class RepositorySearchViewModel(
     val context: Context
 ) : ViewModel() {
 
-    // 検索結果
+    /**
+     * [query]でGitHubのリポジトリを検索し、表示用の一覧を返す。
+     *
+     * `runBlocking`を使っているため、結果を受け取るまで呼び出し元のスレッドをブロックする。
+     * 変換が完了すると[MainActivity.lastSearchDate]を更新する。
+     * 発生した例外は捕捉せず呼び出し元へ送出する。
+     *
+     * @param query GitHubのリポジトリ検索APIの`q`パラメータに渡す検索条件
+     * @return APIが返した順序のままの検索結果。該当がなければ空のリスト
+     */
     fun searchRepositories(query: String): List<RepositoryItem> = runBlocking {
         val client = HttpClient(Android)
 
@@ -44,9 +55,6 @@ class RepositorySearchViewModel(
 
             val repositories = mutableListOf<RepositoryItem>()
 
-            /**
-             * アイテムの個数分ループする
-             */
             for (i in 0 until jsonItems.length()) {
                 val jsonItem = jsonItems.optJSONObject(i)!!
                 val fullName = jsonItem.optString("full_name")
@@ -82,9 +90,19 @@ class RepositorySearchViewModel(
 }
 
 /**
- * AGP 9の環境では kotlin-parcelize プラグインが機能せず、ビルドに失敗する
- * id は解決されるが compiler plugin が登録されず Unresolved reference になる。
- * そのため @Parcelize を使わず Parcelable を手動で実装
+ * 画面に表示する1件のリポジトリ情報。
+ *
+ * 検索画面から詳細画面へNavigationの引数として渡すため[Parcelable]を実装する。
+ * このプロジェクトのビルド環境ではkotlin-parcelizeプラグインを有効にできなかったため
+ * [Parcelable]を手動で実装している。
+ *
+ * @property fullName `owner/repo`形式のリポジトリ名
+ * @property ownerAvatarUrl オーナーのアバター画像のURL
+ * @property languageText 文字列リソースで書式設定された、言語表示用の文字列
+ * @property stargazersCount スター数
+ * @property watchersCount GitHub APIの`watchers_count`の値
+ * @property forksCount フォーク数
+ * @property openIssuesCount GitHub APIの`open_issues_count`の値
  */
 data class RepositoryItem(
     val fullName: String,
@@ -95,6 +113,13 @@ data class RepositoryItem(
     val forksCount: Long,
     val openIssuesCount: Long,
 ) : Parcelable {
+    /**
+     * [Parcel]から各プロパティを復元する。
+     *
+     * 読み出す順序は[writeToParcel]の書き込み順序と一致させる必要がある。
+     *
+     * @param parcel [writeToParcel]が書き込んだ内容を保持する[Parcel]
+     */
     constructor(parcel: Parcel) : this(
         fullName = parcel.readString()!!,
         ownerAvatarUrl = parcel.readString()!!,
@@ -119,6 +144,7 @@ data class RepositoryItem(
 
     companion object CREATOR : Parcelable.Creator<RepositoryItem> {
         override fun createFromParcel(parcel: Parcel): RepositoryItem = RepositoryItem(parcel)
+
         override fun newArray(size: Int): Array<RepositoryItem?> = arrayOfNulls(size)
     }
 }

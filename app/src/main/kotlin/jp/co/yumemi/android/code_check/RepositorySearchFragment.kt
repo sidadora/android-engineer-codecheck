@@ -14,6 +14,11 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.*
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBinding
 
+/**
+ * GitHubのリポジトリをキーワードで検索し、結果を一覧表示する画面。
+ *
+ * キーボードの検索キーで検索を実行し、一覧の項目を選択すると詳細画面へ遷移する。
+ */
 class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -54,6 +59,11 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         }
     }
 
+    /**
+     * 詳細画面へ遷移する。
+     *
+     * @param item 詳細画面に表示するリポジトリ
+     */
     fun navigateToRepositoryDetail(item: RepositoryItem) {
         val action = RepositorySearchFragmentDirections
             .actionRepositorySearchFragmentToRepositoryDetailFragment(repositoryItem = item)
@@ -61,6 +71,11 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
     }
 }
 
+/**
+ * [RepositoryListAdapter]が一覧の差分を判定するために使うコールバック。
+ *
+ * [RepositoryItem.fullName]が一致する項目を同一とみなし、内容の比較は全プロパティの等価性で行う。
+ */
 val repositoryDiffCallback = object : DiffUtil.ItemCallback<RepositoryItem>() {
     override fun areItemsTheSame(oldItem: RepositoryItem, newItem: RepositoryItem): Boolean {
         return oldItem.fullName == newItem.fullName
@@ -71,6 +86,11 @@ val repositoryDiffCallback = object : DiffUtil.ItemCallback<RepositoryItem>() {
     }
 }
 
+/**
+ * 検索結果のリポジトリを、リポジトリ名の一覧として表示するアダプター。
+ *
+ * @property itemClickListener 項目がタップされたことを通知する先
+ */
 class RepositoryListAdapter(
     private val itemClickListener: OnItemClickListener,
 ) : ListAdapter<RepositoryItem, RepositoryListAdapter.ViewHolder>(repositoryDiffCallback) {
@@ -78,6 +98,11 @@ class RepositoryListAdapter(
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view)
 
     interface OnItemClickListener {
+        /**
+         * 一覧の項目がタップされたときに呼ばれる。
+         *
+         * @param item タップされた項目が表すリポジトリ
+         */
         fun onItemClick(item: RepositoryItem)
     }
 

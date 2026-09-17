@@ -10,17 +10,28 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.util.*
 
+/**
+ * 起動時に表示されるActivity。
+ *
+ * レイアウトのNavHostFragmentに、検索画面と詳細画面を切り替えて表示する。
+ */
 class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
     companion object {
+        /**
+         * 最後に検索結果の変換が完了した日時。
+         *
+         * [RepositorySearchViewModel.searchRepositories]が更新し、未設定のまま参照すると例外になる。
+         * Todo : 上記例外は別Issueで対応
+         */
         lateinit var lastSearchDate: Date
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // API 35以降はエッジツーエッジ表示が強制されるため、
-        // システムバー分の余白を明示的に補う
+        // targetSdk 35以上のアプリは、Android 15以降の端末で既定がエッジツーエッジ表示になり、
+        // システムバーの裏にも描画されるため、重ならないよう余白を補う。
         val rootView = findViewById<View>(android.R.id.content)
         ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
