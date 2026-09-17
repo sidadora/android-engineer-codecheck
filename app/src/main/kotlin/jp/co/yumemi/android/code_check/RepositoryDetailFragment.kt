@@ -28,12 +28,12 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
 
         var item = args.repositoryItem
 
-        binding.ownerIcon.load(item.ownerAvatarUrl);
-        binding.repositoryName.text = item.fullName;
-        binding.repositoryLanguage.text = item.languageText;
-        binding.starCount.text = "${item.stargazersCount} stars";
-        binding.watcherCount.text = "${item.watchersCount} watchers";
-        binding.forkCount.text = "${item.forksCount} forks";
-        binding.openIssueCount.text = "${item.openIssuesCount} open issues";
+        binding.ownerIcon.load(item.ownerAvatarUrl)
+        binding.repositoryName.text = item.fullName
+        binding.repositoryLanguage.text = item.languageText
+        binding.starCount.text = "${item.stargazersCount} stars"
+        binding.watcherCount.text = "${item.watchersCount} watchers"
+        binding.forkCount.text = "${item.forksCount} forks"
+        binding.openIssueCount.text = "${item.openIssuesCount} open issues"
     }
 }
