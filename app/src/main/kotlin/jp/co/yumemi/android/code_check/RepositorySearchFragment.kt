@@ -24,8 +24,10 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         val viewModel = RepositorySearchViewModel(requireContext())
 
         val layoutManager = LinearLayoutManager(requireContext())
+
         val dividerItemDecoration =
             DividerItemDecoration(requireContext(), layoutManager.orientation)
+
         val adapter = RepositoryListAdapter(
             object : RepositoryListAdapter.OnItemClickListener {
                 override fun onItemClick(item: RepositoryItem) {
@@ -37,11 +39,9 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         binding.searchInputText
             .setOnEditorActionListener { editText, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                    editText.text.toString().let {
-                        viewModel.searchRepositories(it).apply {
-                            adapter.submitList(this)
-                        }
-                    }
+                    adapter.submitList(
+                        viewModel.searchRepositories(editText.text.toString())
+                    )
                     return@setOnEditorActionListener true
                 }
                 return@setOnEditorActionListener false
@@ -69,7 +69,6 @@ val repositoryDiffCallback = object : DiffUtil.ItemCallback<RepositoryItem>() {
     override fun areContentsTheSame(oldItem: RepositoryItem, newItem: RepositoryItem): Boolean {
         return oldItem == newItem
     }
-
 }
 
 class RepositoryListAdapter(
