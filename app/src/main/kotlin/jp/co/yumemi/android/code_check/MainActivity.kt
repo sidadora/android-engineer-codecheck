@@ -33,9 +33,8 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
         /**
          * 最後に検索結果の変換が完了した日時。
          *
-         * [RepositorySearchViewModel.searchRepositories]が更新し、未設定のまま参照すると例外になる。
-         * Todo : 上記例外は別Issueで対応
+         * [RepositorySearchViewModel.searchRepositories]が更新する。
          */
-        lateinit var lastSearchDate: Date
+        var lastSearchDate: Date? = null
     }
 }

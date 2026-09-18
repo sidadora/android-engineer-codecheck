@@ -12,6 +12,8 @@ import coil.load
 import jp.co.yumemi.android.code_check.MainActivity.Companion.lastSearchDate
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositoryDetailBinding
 
+private const val TAG = "RepositoryDetail"
+
 /**
  * 検索結果で選択したリポジトリの詳細を表示する画面。
  *
@@ -26,7 +28,12 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        Log.d("検索した日時", lastSearchDate.toString())
+        val searchedAt = lastSearchDate
+        if (searchedAt != null) {
+            Log.d(TAG, "検索日時: $searchedAt")
+        } else {
+            Log.d(TAG, "検索日時がありません")
+        }
 
         // 表示の設定はこの中で完結し、View破棄後に参照しないためローカル変数で保持する。
         val binding = FragmentRepositoryDetailBinding.bind(view)
