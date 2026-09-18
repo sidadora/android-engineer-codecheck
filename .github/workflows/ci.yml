@@ -2,17 +2,21 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
   push:
-    branches: [main]
+    branches: [ main ]
 
 permissions:
   contents: read
 
+# PRの古い実行はキャンセルし、main更新は実行ごとに分ける。
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: >-
+    ci-${{ github.workflow }}-${{ github.ref }}-${{
+      github.event_name == 'push' && github.run_id || 'pr'
+    }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   ktlint:
@@ -74,3 +78,35 @@ jobs:
           name: debug-apk-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
+
+  # mainのCI成功後、バージョン更新があれば検証済みSHAへタグを作る。
+  # バージョン比較とタグ操作は.github/scripts/に分離する。
+  tag:
+    name: tag
+    needs: [ build, ktlint ]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # 更新前後を比較するため、履歴と対象SHAを取得する。
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      # 失敗時はジョブが止まり、タグ作成へ進まない。
+      - name: Resolve release tag
+        id: resolve
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: bash .github/scripts/resolve-release-tag.sh "$BEFORE_SHA" "$AFTER_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Create release tag
+        if: steps.resolve.outputs.changed == 'true'
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+          TARGET_SHA: ${{ github.sha }}
+        run: bash .github/scripts/create-release-tag.sh "$TAG" "$TARGET_SHA"
