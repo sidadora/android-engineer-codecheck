@@ -20,10 +20,6 @@ import jp.co.yumemi.android.code_check.databinding.FragmentRepositoryDetailBindi
 class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
     private val args: RepositoryDetailFragmentArgs by navArgs()
 
-    private var viewBinding: FragmentRepositoryDetailBinding? = null
-
-    private val binding get() = viewBinding!!
-
     override fun onViewCreated(
         view: View,
         savedInstanceState: Bundle?,
@@ -32,7 +28,8 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
 
         Log.d("検索した日時", lastSearchDate.toString())
 
-        viewBinding = FragmentRepositoryDetailBinding.bind(view)
+        // 表示の設定はこの中で完結し、View破棄後に参照しないためローカル変数で保持する。
+        val binding = FragmentRepositoryDetailBinding.bind(view)
 
         val item = args.repositoryItem
 
