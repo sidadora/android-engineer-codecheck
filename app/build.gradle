@@ -34,6 +34,21 @@ android {
     }
 }
 
+// APK名にバージョンとビルド種別を含める。
+// release-unsignedは固定表記のため、Releaseの署名設定を追加する際は見直す。
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.each { output ->
+            def variantSuffix = variant.name == 'release' ? 'release-unsigned' : variant.name
+            output.outputFileName.set(
+                    output.versionName.map { versionName ->
+                        "github-repository-search-v${versionName}-${variantSuffix}.apk"
+                    }
+            )
+        }
+    }
+}
+
 dependencies {
 
     implementation 'androidx.core:core-ktx:1.19.0'
