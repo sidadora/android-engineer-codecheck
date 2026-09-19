@@ -8,6 +8,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.annotation.StringRes
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
@@ -63,9 +64,13 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
                 return
             }
 
-            // 失敗時は一覧を更新せず、前回の検索結果をそのまま残す。
+            // 失敗時は一覧も該当なしの表示も更新せず、前回の検索結果をそのまま残す。
             when (val result = viewModel.searchRepositories(query)) {
-                is RepositorySearchResult.Success -> adapter.submitList(result.items)
+                is RepositorySearchResult.Success -> {
+                    adapter.submitList(result.items)
+                    binding.emptyResultText.isVisible = result.items.isEmpty()
+                }
+
                 is RepositorySearchResult.Failure -> showSearchErrorDialog(result.reason)
             }
         }
