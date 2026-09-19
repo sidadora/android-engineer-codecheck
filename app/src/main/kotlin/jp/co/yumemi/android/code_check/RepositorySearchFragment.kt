@@ -109,10 +109,15 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
      * @param item 詳細画面に表示するリポジトリ
      */
     private fun navigateToRepositoryDetail(item: RepositoryItem) {
+        val navController = findNavController()
+        // 連続タップ防止
+        // 遷移元にいるときだけ遷移し、詳細画面の重複と不正なaction指定による例外を防ぐ。
+        if (navController.currentDestination?.id != R.id.repository_search_fragment) return
+
         val action =
             RepositorySearchFragmentDirections
                 .actionRepositorySearchFragmentToRepositoryDetailFragment(repositoryItem = item)
-        findNavController().navigate(action)
+        navController.navigate(action)
     }
 }
 
