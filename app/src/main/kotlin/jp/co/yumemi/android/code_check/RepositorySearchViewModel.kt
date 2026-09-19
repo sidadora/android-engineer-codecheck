@@ -4,8 +4,7 @@
 package jp.co.yumemi.android.code_check
 
 import android.content.Context
-import android.os.Parcel
-import android.os.Parcelable
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -14,152 +13,74 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
+import io.ktor.http.isSuccess
 import jp.co.yumemi.android.code_check.MainActivity.Companion.lastSearchDate
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
+import org.json.JSONException
+import java.io.IOException
 import java.util.Date
 
+private const val TAG = "RepositorySearch"
+
 /**
- * GitHubのリポジトリ検索APIを呼び出し、画面表示用の[RepositoryItem]に変換する。
+ * GitHubのリポジトリ検索APIを呼び出し、結果を[RepositorySearchResult]として返す。
  *
- * @property context 言語表示用の文字列リソースを取得するために使う
+ * レスポンスの解析と表示用データへの変換は[RepositoryResponseParser]に委譲する。
+ *
+ * @param context レスポンスの変換に使う[RepositoryResponseParser]の生成にのみ渡す
  */
 class RepositorySearchViewModel(
-    private val context: Context,
+    context: Context,
 ) : ViewModel() {
+    private val responseParser = RepositoryResponseParser(context)
+
     /**
-     * [query]でGitHubのリポジトリを検索し、表示用の一覧を返す。
+     * [query]でGitHubのリポジトリを検索し、結果を返す。
      *
      * `runBlocking`を使っているため、結果を受け取るまで呼び出し元のスレッドをブロックする。
-     * 変換が完了すると[MainActivity.lastSearchDate]を更新する。
-     * 発生した例外は捕捉せず呼び出し元へ送出する。
+     * 成功した場合のみ[MainActivity.lastSearchDate]を更新する。
+     * 通信の失敗、HTTPエラー、レスポンスが想定の形式でない場合は[RepositorySearchResult.Failure]を返す。
+     * それ以外の例外は呼び出し元へ伝播する。
      *
      * @param query GitHubのリポジトリ検索APIの`q`パラメータに渡す検索条件
-     * @return APIが返した順序のままの検索結果。該当がなければ空のリスト
+     * @return 成功時は検索結果、失敗時は[RepositorySearchResult.Failure]
      */
-    fun searchRepositories(query: String): List<RepositoryItem> =
+    fun searchRepositories(query: String): RepositorySearchResult =
         runBlocking {
-            val client = HttpClient(Android)
-
             return@runBlocking GlobalScope
                 .async {
-                    val response: HttpResponse =
-                        client.get(
-                            "https://api.github.com/search/repositories",
-                        ) {
-                            header("Accept", "application/vnd.github.v3+json")
-                            parameter("q", query)
+                    // クライアントを使うコルーチン内で生成し、useでどの経路でも終了処理を行う。
+                    HttpClient(Android).use { client ->
+                        try {
+                            val response: HttpResponse =
+                                client.get(
+                                    "https://api.github.com/search/repositories",
+                                ) {
+                                    header("Accept", "application/vnd.github.v3+json")
+                                    parameter("q", query)
+                                }
+
+                            // expectSuccessは既定でfalseのため、HTTPエラーでも例外にならず本文が返る。
+                            if (!response.status.isSuccess()) {
+                                Log.w(TAG, "検索APIがエラーを返しました: ${response.status}")
+                                RepositorySearchResult.Failure
+                            } else {
+                                val repositories = responseParser.parse(response.body<String>())
+
+                                lastSearchDate = Date()
+
+                                RepositorySearchResult.Success(repositories)
+                            }
+                        } catch (e: IOException) {
+                            Log.w(TAG, "検索の通信に失敗しました", e)
+                            RepositorySearchResult.Failure
+                        } catch (e: JSONException) {
+                            Log.w(TAG, "検索結果の解析に失敗しました", e)
+                            RepositorySearchResult.Failure
                         }
-
-                    val jsonBody = JSONObject(response.body<String>())
-
-                    val jsonItems = jsonBody.optJSONArray("items")!!
-
-                    val repositories = mutableListOf<RepositoryItem>()
-
-                    for (i in 0 until jsonItems.length()) {
-                        repositories.add(toRepositoryItem(jsonItems.optJSONObject(i)!!))
                     }
-
-                    lastSearchDate = Date()
-
-                    return@async repositories.toList()
                 }.await()
         }
-
-    /**
-     * 検索結果1件分のJSONを、表示用の[RepositoryItem]に変換する。
-     *
-     * @param jsonItem リポジトリ検索APIのレスポンス内、`items`配列の1要素
-     * @return 画面表示に使う1件分のリポジトリ情報
-     */
-    private fun toRepositoryItem(jsonItem: JSONObject): RepositoryItem {
-        val fullName = jsonItem.optString("full_name")
-        val ownerAvatarUrl =
-            jsonItem.optJSONObject("owner")!!.optString("avatar_url")
-        val language = jsonItem.optString("language")
-        val stargazersCount = jsonItem.optLong("stargazers_count")
-        val watchersCount = jsonItem.optLong("watchers_count")
-        val forksCount = jsonItem.optLong("forks_count")
-        val openIssuesCount = jsonItem.optLong("open_issues_count")
-
-        return RepositoryItem(
-            fullName = fullName,
-            ownerAvatarUrl = ownerAvatarUrl,
-            languageText =
-                context.getString(
-                    R.string.repository_language_format,
-                    language,
-                ),
-            stargazersCount = stargazersCount,
-            watchersCount = watchersCount,
-            forksCount = forksCount,
-            openIssuesCount = openIssuesCount,
-        )
-    }
-}
-
-/**
- * 画面に表示する1件のリポジトリ情報。
- *
- * 検索画面から詳細画面へNavigationの引数として渡すため[Parcelable]を実装する。
- * このプロジェクトのビルド環境ではkotlin-parcelizeプラグインを有効にできなかったため
- * [Parcelable]を手動で実装している。
- *
- * @property fullName `owner/repo`形式のリポジトリ名
- * @property ownerAvatarUrl オーナーのアバター画像のURL
- * @property languageText 文字列リソースで書式設定された、言語表示用の文字列
- * @property stargazersCount スター数
- * @property watchersCount GitHub APIの`watchers_count`の値
- * @property forksCount フォーク数
- * @property openIssuesCount GitHub APIの`open_issues_count`の値
- */
-data class RepositoryItem(
-    val fullName: String,
-    val ownerAvatarUrl: String,
-    val languageText: String,
-    val stargazersCount: Long,
-    val watchersCount: Long,
-    val forksCount: Long,
-    val openIssuesCount: Long,
-) : Parcelable {
-    /**
-     * [Parcel]から各プロパティを復元する。
-     *
-     * 読み出す順序は[writeToParcel]の書き込み順序と一致させる必要がある。
-     *
-     * @param parcel [writeToParcel]が書き込んだ内容を保持する[Parcel]
-     */
-    constructor(parcel: Parcel) : this(
-        fullName = parcel.readString()!!,
-        ownerAvatarUrl = parcel.readString()!!,
-        languageText = parcel.readString()!!,
-        stargazersCount = parcel.readLong(),
-        watchersCount = parcel.readLong(),
-        forksCount = parcel.readLong(),
-        openIssuesCount = parcel.readLong(),
-    )
-
-    override fun writeToParcel(
-        parcel: Parcel,
-        flags: Int,
-    ) {
-        parcel.writeString(fullName)
-        parcel.writeString(ownerAvatarUrl)
-        parcel.writeString(languageText)
-        parcel.writeLong(stargazersCount)
-        parcel.writeLong(watchersCount)
-        parcel.writeLong(forksCount)
-        parcel.writeLong(openIssuesCount)
-    }
-
-    override fun describeContents(): Int = 0
-
-    companion object CREATOR : Parcelable.Creator<RepositoryItem> {
-        override fun createFromParcel(parcel: Parcel): RepositoryItem = RepositoryItem(parcel)
-
-        override fun newArray(size: Int): Array<RepositoryItem?> = arrayOfNulls(size)
-    }
 }

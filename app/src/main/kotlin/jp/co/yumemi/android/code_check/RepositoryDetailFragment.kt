@@ -40,7 +40,13 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
 
         val item = args.repositoryItem
 
-        binding.ownerIcon.load(item.ownerAvatarUrl)
+        // オーナー情報がない場合に、無関係な既定画像を表示しないよう明示的に扱う。
+        val ownerAvatarUrl = item.ownerAvatarUrl
+        if (ownerAvatarUrl != null) {
+            binding.ownerIcon.load(ownerAvatarUrl)
+        } else {
+            binding.ownerIcon.setImageDrawable(null)
+        }
         binding.repositoryName.text = item.fullName
         binding.repositoryLanguage.text = item.languageText
         binding.starCount.text = "${item.stargazersCount} stars"

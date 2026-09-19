@@ -4,19 +4,17 @@
 package jp.co.yumemi.android.code_check
 
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.ListAdapter
-import androidx.recyclerview.widget.RecyclerView
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBinding
+
+// 検索エラーの通知ダイアログを識別するタグ。重複表示の判定に使う。
+private const val SEARCH_ERROR_DIALOG_TAG = "searchError"
 
 /**
  * GitHubのリポジトリをキーワードで検索し、結果を一覧表示する画面。
@@ -52,9 +50,11 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
             .setOnEditorActionListener { editText, actionId, _ ->
                 val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
                 if (isSearchAction) {
-                    adapter.submitList(
-                        viewModel.searchRepositories(editText.text.toString()),
-                    )
+                    // 失敗時は一覧を更新せず、前回の検索結果をそのまま残す。
+                    when (val result = viewModel.searchRepositories(editText.text.toString())) {
+                        is RepositorySearchResult.Success -> adapter.submitList(result.items)
+                        RepositorySearchResult.Failure -> showSearchErrorDialog()
+                    }
                 }
                 isSearchAction
             }
@@ -67,6 +67,24 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
     }
 
     /**
+     * 検索が失敗したことを知らせる。
+     *
+     * この画面のViewが表示状態でなければ通知しない。
+     * 詳細画面へ遷移するとこの画面のViewは破棄されるため、別画面にダイアログが出ることはない。
+     * この通知は閉じるだけで処理が進まないため、状態保存後などに破棄されても操作を妨げない。
+     */
+    private fun showSearchErrorDialog() {
+        if (!viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+
+        AlertDialogFragment.show(
+            fragmentManager = childFragmentManager,
+            tag = SEARCH_ERROR_DIALOG_TAG,
+            titleRes = R.string.search_error_title,
+            messageRes = R.string.search_failure_message,
+        )
+    }
+
+    /**
      * 詳細画面へ遷移する。
      *
      * @param item 詳細画面に表示するリポジトリ
@@ -76,70 +94,5 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
             RepositorySearchFragmentDirections
                 .actionRepositorySearchFragmentToRepositoryDetailFragment(repositoryItem = item)
         findNavController().navigate(action)
-    }
-}
-
-/**
- * 検索結果のリポジトリを、リポジトリ名の一覧として表示するアダプター。
- *
- * @property itemClickListener 項目がタップされたことを通知する先
- */
-class RepositoryListAdapter(
-    private val itemClickListener: OnItemClickListener,
-) : ListAdapter<RepositoryItem, RepositoryListAdapter.ViewHolder>(repositoryDiffCallback) {
-    class ViewHolder(
-        view: View,
-    ) : RecyclerView.ViewHolder(view)
-
-    interface OnItemClickListener {
-        /**
-         * 一覧の項目がタップされたときに呼ばれる。
-         *
-         * @param item タップされた項目が表すリポジトリ
-         */
-        fun onItemClick(item: RepositoryItem)
-    }
-
-    override fun onCreateViewHolder(
-        parent: ViewGroup,
-        viewType: Int,
-    ): ViewHolder {
-        val view =
-            LayoutInflater
-                .from(parent.context)
-                .inflate(R.layout.item_repository, parent, false)
-        return ViewHolder(view)
-    }
-
-    override fun onBindViewHolder(
-        holder: ViewHolder,
-        position: Int,
-    ) {
-        val item = getItem(position)
-        holder.itemView.findViewById<TextView>(R.id.repository_name).text = item.fullName
-
-        holder.itemView.setOnClickListener {
-            itemClickListener.onItemClick(item)
-        }
-    }
-
-    companion object {
-        /**
-         * 一覧の差分を判定するために使うコールバック。
-         *
-         * [RepositoryItem.fullName]が一致する項目を同一とみなし、内容の比較は全プロパティの等価性で行う。
-         */
-        private val repositoryDiffCallback =
-            object : DiffUtil.ItemCallback<RepositoryItem>() {
-                override fun areItemsTheSame(
-                    oldItem: RepositoryItem,
-                    newItem: RepositoryItem,
-                ): Boolean = oldItem.fullName == newItem.fullName
-
-                override fun areContentsTheSame(
-                    oldItem: RepositoryItem,
-                    newItem: RepositoryItem,
-                ): Boolean = oldItem == newItem
-            }
     }
 }
