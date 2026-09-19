@@ -1,7 +1,4 @@
-/*
- * Copyright © 2021 YUMEMI Inc. All rights reserved.
- */
-package jp.co.yumemi.android.code_check
+package jp.co.yumemi.android.code_check.model
 
 import android.os.Parcel
 import android.os.Parcelable
@@ -9,9 +6,9 @@ import android.os.Parcelable
 /**
  * 画面に表示する1件のリポジトリ情報。
  *
- * 検索画面から詳細画面へNavigationの引数として渡すため[Parcelable]を実装する。
+ * 検索画面から詳細画面へNavigationの引数として渡すため[android.os.Parcelable]を実装する。
  * このプロジェクトのビルド環境ではkotlin-parcelizeプラグインを有効にできなかったため
- * [Parcelable]を手動で実装している。
+ * [android.os.Parcelable]を手動で実装している。
  *
  * @property fullName `owner/repo`形式のリポジトリ名
  * @property ownerAvatarUrl オーナーのアバター画像のURL。オーナー情報がない場合はnull
@@ -31,13 +28,13 @@ data class RepositoryItem(
     val openIssuesCount: Long,
 ) : Parcelable {
     /**
-     * [Parcel]から各プロパティを復元する。
+     * [android.os.Parcel]から各プロパティを復元する。
      *
      * 読み出す順序は[writeToParcel]の書き込み順序と一致させる必要がある。
      * [writeToParcel]は[fullName]と[languageText]を非nullで書き込み、
      * [ownerAvatarUrl]だけnullを許容する。この契約を根拠に、前二者は非null表明で読み出す。
      *
-     * @param parcel [writeToParcel]が書き込んだ内容を保持する[Parcel]
+     * @param parcel [writeToParcel]が書き込んだ内容を保持する[android.os.Parcel]
      */
     constructor(parcel: Parcel) : this(
         fullName = parcel.readString()!!,

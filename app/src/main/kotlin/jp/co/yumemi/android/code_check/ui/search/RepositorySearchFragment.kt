@@ -1,7 +1,7 @@
 /*
  * Copyright © 2021 YUMEMI Inc. All rights reserved.
  */
-package jp.co.yumemi.android.code_check
+package jp.co.yumemi.android.code_check.ui.search
 
 import android.os.Bundle
 import android.view.KeyEvent
@@ -12,7 +12,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
+import jp.co.yumemi.android.code_check.R
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBinding
+import jp.co.yumemi.android.code_check.model.RepositoryItem
+import jp.co.yumemi.android.code_check.ui.common.AlertDialogFragment
 
 // 検索エラーの通知ダイアログを識別するタグ。重複表示の判定に使う。
 private const val SEARCH_ERROR_DIALOG_TAG = "searchError"

@@ -1,7 +1,4 @@
-/*
- * Copyright © 2021 YUMEMI Inc. All rights reserved.
- */
-package jp.co.yumemi.android.code_check
+package jp.co.yumemi.android.code_check.ui.search
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -9,6 +6,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import jp.co.yumemi.android.code_check.databinding.ItemRepositoryBinding
+import jp.co.yumemi.android.code_check.model.RepositoryItem
 
 /**
  * 検索結果のリポジトリを、リポジトリ名の一覧として表示するアダプター。

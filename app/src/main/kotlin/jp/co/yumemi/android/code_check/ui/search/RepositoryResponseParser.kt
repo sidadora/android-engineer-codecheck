@@ -1,9 +1,11 @@
 /*
  * Copyright © 2021 YUMEMI Inc. All rights reserved.
  */
-package jp.co.yumemi.android.code_check
+package jp.co.yumemi.android.code_check.ui.search
 
 import android.content.Context
+import jp.co.yumemi.android.code_check.R
+import jp.co.yumemi.android.code_check.model.RepositoryItem
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject

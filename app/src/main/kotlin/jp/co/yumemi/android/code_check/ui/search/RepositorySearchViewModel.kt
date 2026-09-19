@@ -1,7 +1,7 @@
 /*
  * Copyright © 2021 YUMEMI Inc. All rights reserved.
  */
-package jp.co.yumemi.android.code_check
+package jp.co.yumemi.android.code_check.ui.search
 
 import android.content.Context
 import android.util.Log
@@ -40,7 +40,7 @@ class RepositorySearchViewModel(
      * [query]でGitHubのリポジトリを検索し、結果を返す。
      *
      * `runBlocking`を使っているため、結果を受け取るまで呼び出し元のスレッドをブロックする。
-     * 成功した場合のみ[MainActivity.lastSearchDate]を更新する。
+     * 成功した場合のみ[lastSearchDate]を更新する。
      * 通信の失敗、HTTPエラー、レスポンスが想定の形式でない場合は[RepositorySearchResult.Failure]を返す。
      * それ以外の例外は呼び出し元へ伝播する。
      *

@@ -1,7 +1,6 @@
-/*
- * Copyright © 2021 YUMEMI Inc. All rights reserved.
- */
-package jp.co.yumemi.android.code_check
+package jp.co.yumemi.android.code_check.ui.search
+
+import jp.co.yumemi.android.code_check.model.RepositoryItem
 
 /**
  * リポジトリ検索の結果。
