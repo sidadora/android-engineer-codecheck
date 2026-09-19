@@ -45,7 +45,9 @@ class RepositoryListAdapter(
     ): ViewHolder =
         ViewHolder(
             ItemRepositoryBinding.inflate(
-                LayoutInflater.from(parent.context), parent, false
+                LayoutInflater.from(parent.context),
+                parent,
+                false,
             ),
         )
 

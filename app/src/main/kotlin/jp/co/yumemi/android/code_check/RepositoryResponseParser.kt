@@ -42,15 +42,15 @@ internal class RepositoryResponseParser(
         val jsonItems = root.requireArray("", "items")
 
         return List(jsonItems.length()) { index ->
-            val itemPath = "items[$index]"
+            val path = "items[$index]"
             // 添字が範囲内でも、その要素がJSONObjectである保証はない。
             val value = jsonItems.opt(index)
             val jsonItem =
                 value.asJsonObjectOrNull()
                     ?: throw JSONException(
-                        "$itemPath: オブジェクトが必要です（実際は${value.jsonTypeName()}）"
+                        "$path: オブジェクトが必要です（実際は${value.jsonTypeName()}）",
                     )
-            toRepositoryItem(jsonItem, itemPath)
+            toRepositoryItem(jsonItem, path)
         }
     }
 
@@ -61,28 +61,24 @@ internal class RepositoryResponseParser(
      * いずれもキー自体の欠落は異常とする。
      *
      * @param jsonItem リポジトリ検索APIのレスポンス内、`items`配列の1要素
-     * @param itemPath エラーメッセージに含める、この要素の位置
+     * @param path エラーメッセージに含める、この要素の位置
      * @return 画面表示に使う1件分のリポジトリ情報
      * @throws JSONException 必須項目の欠落や型違いがある場合
      */
     private fun toRepositoryItem(
         jsonItem: JSONObject,
-        itemPath: String,
+        path: String,
     ): RepositoryItem {
-        val fullName = jsonItem.requireString(itemPath, "full_name")
+        val fullName = jsonItem.requireString(path, "full_name")
         val ownerAvatarUrl =
             jsonItem
-                .requireNullableObject(itemPath, "owner")
-                ?.requireString("$itemPath.owner", "avatar_url")
-        val language = jsonItem.requireNullableString(itemPath, "language")
-        val stargazersCount = jsonItem.requireCount(
-            itemPath, "stargazers_count"
-        )
-        val watchersCount = jsonItem.requireCount(itemPath, "watchers_count")
-        val forksCount = jsonItem.requireCount(itemPath, "forks_count")
-        val openIssuesCount = jsonItem.requireCount(
-            itemPath, "open_issues_count"
-        )
+                .requireNullableObject(path, "owner")
+                ?.requireString("$path.owner", "avatar_url")
+        val language = jsonItem.requireNullableString(path, "language")
+        val stargazersCount = jsonItem.requireCount(path, "stargazers_count")
+        val watchersCount = jsonItem.requireCount(path, "watchers_count")
+        val forksCount = jsonItem.requireCount(path, "forks_count")
+        val openIssuesCount = jsonItem.requireCount(path, "open_issues_count")
 
         return RepositoryItem(
             fullName = fullName,
@@ -92,7 +88,8 @@ internal class RepositoryResponseParser(
                     context.getString(R.string.repository_language_unknown)
                 } else {
                     context.getString(
-                        R.string.repository_language_format, language
+                        R.string.repository_language_format,
+                        language,
                     )
                 },
             stargazersCount = stargazersCount,

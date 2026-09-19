@@ -128,5 +128,7 @@ private fun Bundle.requireBoolean(key: String): Boolean {
 }
 
 @StringRes
-private fun Bundle.optionalStringRes(key: String): Int? =
-    if (containsKey(key)) requireStringRes(key) else null
+private fun Bundle.optionalStringRes(key: String): Int? {
+    if (!containsKey(key)) return null
+    return requireStringRes(key)
+}
