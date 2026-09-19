@@ -76,7 +76,7 @@ class RepositorySearchViewModel(
                                 RepositorySearchResult.Success(repositories)
                             }
                         } catch (e: IOException) {
-                            Log.w(TAG, "検索の通信に失敗しました", e)
+                            Log.w(TAG, "検索の通信に失敗しました: ${e::class.java.simpleName}")
                             RepositorySearchResult.Failure
                         } catch (e: JSONException) {
                             Log.w(TAG, "検索結果の解析に失敗しました", e)
