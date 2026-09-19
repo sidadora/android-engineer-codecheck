@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
@@ -16,9 +17,13 @@ import jp.co.yumemi.android.code_check.R
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBinding
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 import jp.co.yumemi.android.code_check.ui.common.AlertDialogFragment
+import jp.co.yumemi.android.code_check.ui.search.RepositorySearchResult.FailureReason
 
 // 検索エラーの通知ダイアログを識別するタグ。重複表示の判定に使う。
 private const val SEARCH_ERROR_DIALOG_TAG = "searchError"
+
+// 空文字、スペースで検索した際のアラートダイアログを識別するタグ
+private const val SEARCH_INPUT_REQUIRED_DIALOG_TAG = "searchInputRequired"
 
 /**
  * GitHubのリポジトリをキーワードで検索し、結果を一覧表示する画面。
@@ -51,10 +56,17 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
             )
 
         fun search(query: String) {
+            // 空・空白のみはAPIがエラーとして返すため、通信する前に入力を促す。
+            // 検索を実行しないので、一覧も検索日時も変わらない。
+            if (query.isBlank()) {
+                showInputRequiredDialog()
+                return
+            }
+
             // 失敗時は一覧を更新せず、前回の検索結果をそのまま残す。
             when (val result = viewModel.searchRepositories(query)) {
                 is RepositorySearchResult.Success -> adapter.submitList(result.items)
-                RepositorySearchResult.Failure -> showSearchErrorDialog()
+                is RepositorySearchResult.Failure -> showSearchErrorDialog(result.reason)
             }
         }
 
@@ -88,21 +100,47 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         }
     }
 
+    /** 検索条件が未入力であることを知らせる。 */
+    private fun showInputRequiredDialog() {
+        showNotification(
+            tag = SEARCH_INPUT_REQUIRED_DIALOG_TAG,
+            titleRes = R.string.search_input_required_title,
+            messageRes = R.string.search_input_required_message,
+        )
+    }
+
     /**
-     * 検索が失敗したことを知らせる。
+     * 検索が失敗したことを、原因に応じた文言で知らせる。
+     *
+     * @param reason 検索が失敗した理由
+     */
+    private fun showSearchErrorDialog(reason: FailureReason) {
+        showNotification(
+            tag = SEARCH_ERROR_DIALOG_TAG,
+            titleRes = R.string.search_error_title,
+            messageRes = reason.messageRes(),
+        )
+    }
+
+    /**
+     * 閉じるだけで処理が進まない通知をダイアログで表示する。
      *
      * この画面のViewが表示状態でなければ通知しない。
      * 詳細画面へ遷移するとこの画面のViewは破棄されるため、別画面にダイアログが出ることはない。
-     * この通知は閉じるだけで処理が進まないため、状態保存後などに破棄されても操作を妨げない。
+     * 状態保存後などに破棄されても操作を妨げないため、表示の延期や再送は行わない。
      */
-    private fun showSearchErrorDialog() {
+    private fun showNotification(
+        tag: String,
+        @StringRes titleRes: Int,
+        @StringRes messageRes: Int,
+    ) {
         if (!viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
 
         AlertDialogFragment.show(
             fragmentManager = childFragmentManager,
-            tag = SEARCH_ERROR_DIALOG_TAG,
-            titleRes = R.string.search_error_title,
-            messageRes = R.string.search_failure_message,
+            tag = tag,
+            titleRes = titleRes,
+            messageRes = messageRes,
         )
     }
 
@@ -128,3 +166,19 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
 private val enterKeyCodes = setOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
 
 private fun KeyEvent.isEnterKey(): Boolean = keyCode in enterKeyCodes
+
+/**
+ * 失敗の理由に対応する、利用者向けの文言を返す。
+ *
+ * 次に取れる行動が伝わることを優先し、状態コードなどの内部の情報は含めない。
+ */
+@StringRes
+private fun FailureReason.messageRes(): Int =
+    when (this) {
+        FailureReason.NETWORK -> R.string.search_failure_network_message
+        FailureReason.RATE_LIMIT -> R.string.search_failure_rate_limit_message
+        FailureReason.REQUEST_REJECTED -> R.string.search_failure_request_rejected_message
+        FailureReason.SERVER -> R.string.search_failure_server_message
+        FailureReason.RESPONSE_FORMAT -> R.string.search_failure_response_format_message
+        FailureReason.UNKNOWN -> R.string.search_failure_message
+    }
