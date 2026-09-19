@@ -4,6 +4,7 @@
 package jp.co.yumemi.android.code_check
 
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.fragment.app.Fragment
@@ -46,19 +47,35 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
                 },
             )
 
+        fun search(query: String) {
+            // 失敗時は一覧を更新せず、前回の検索結果をそのまま残す。
+            when (val result = viewModel.searchRepositories(query)) {
+                is RepositorySearchResult.Success -> adapter.submitList(result.items)
+                RepositorySearchResult.Failure -> showSearchErrorDialog()
+            }
+        }
+
         binding.searchInputText
-            .setOnEditorActionListener { editText, actionId, _ ->
-                val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
-                if (isSearchAction) {
-                    // 失敗時は一覧を更新せず、前回の検索結果をそのまま残す。
-                    when (
-                        val result = viewModel.searchRepositories(editText.text.toString())
-                    ) {
-                        is RepositorySearchResult.Success -> adapter.submitList(result.items)
-                        RepositorySearchResult.Failure -> showSearchErrorDialog()
+            .setOnEditorActionListener { editText, actionId, event ->
+                when {
+                    // Android 14以降は単一行入力のEnterキーでもアクションIDが渡るため、
+                    // IMEの検索操作とEnterキーはイベントの有無で判別する。
+                    event == null -> {
+                        val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
+                        if (isSearchAction) search(editText.text.toString())
+                        isSearchAction
                     }
+                    // Enterキーは押下・リピート・離すのそれぞれで呼ばれるため、最初の押下だけ検索する。
+                    // 残りも同じ操作の一部として消費し、二重実行と改行の入力を防ぐ。
+                    event.isEnterKey() -> {
+                        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                            search(editText.text.toString())
+                        }
+                        true
+                    }
+
+                    else -> false
                 }
-                isSearchAction
             }
 
         binding.repositoryListView.also {
@@ -98,3 +115,8 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         findNavController().navigate(action)
     }
 }
+
+/** Enterとして扱うキーコード。テンキーのEnterも同じ操作として扱う。 */
+private val enterKeyCodes = setOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
+
+private fun KeyEvent.isEnterKey(): Boolean = keyCode in enterKeyCodes
