@@ -9,16 +9,16 @@ import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.navArgs
 import coil.load
-import jp.co.yumemi.android.code_check.MainActivity.Companion.lastSearchDate
 import jp.co.yumemi.android.code_check.R
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositoryDetailBinding
+import java.util.Date
 
 private const val TAG = "RepositoryDetail"
 
 /**
  * 検索結果で選択したリポジトリの詳細を表示する画面。
  *
- * 表示するリポジトリはNavigationの引数`repositoryItem`で受け取る。
+ * 表示する内容と、その一覧を取得した時刻はNavigationの引数で受け取る。
  */
 class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
     private val args: RepositoryDetailFragmentArgs by navArgs()
@@ -29,12 +29,8 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        val searchedAt = lastSearchDate
-        if (searchedAt != null) {
-            Log.d(TAG, "検索日時: $searchedAt")
-        } else {
-            Log.d(TAG, "検索日時がありません")
-        }
+        // 表示中の結果に対応する時刻。後続の検索が完了しても変わらない。
+        Log.d(TAG, "検索日時: ${Date(args.searchedAtMillis)}")
 
         // 表示の設定はこの中で完結し、View破棄後に参照しないためローカル変数で保持する。
         val binding = FragmentRepositoryDetailBinding.bind(view)
@@ -49,7 +45,7 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
             binding.ownerIcon.setImageDrawable(null)
         }
         binding.repositoryName.text = item.fullName
-        binding.repositoryLanguage.text = item.languageText
+        binding.repositoryLanguage.text = languageText(item.language)
         binding.starCount.text =
             getString(R.string.repository_stars_format, item.stargazersCount)
         binding.watcherCount.text =
@@ -62,4 +58,12 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
                 item.openIssuesCount,
             )
     }
+
+    /** 言語の表示文言を組み立てる。設定がない場合は補完せず、その旨を示す。 */
+    private fun languageText(language: String?): String =
+        if (language == null) {
+            getString(R.string.repository_language_unknown)
+        } else {
+            getString(R.string.repository_language_format, language)
+        }
 }

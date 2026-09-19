@@ -12,7 +12,7 @@ import android.os.Parcelable
  *
  * @property fullName `owner/repo`形式のリポジトリ名
  * @property ownerAvatarUrl オーナーのアバター画像のURL。オーナー情報がない場合はnull
- * @property languageText 文字列リソースで書式設定された、言語表示用の文字列
+ * @property language GitHub APIの`language`の値。設定がない場合はnull
  * @property stargazersCount スター数
  * @property watchersCount GitHub APIの`watchers_count`の値
  * @property forksCount フォーク数
@@ -21,7 +21,7 @@ import android.os.Parcelable
 data class RepositoryItem(
     val fullName: String,
     val ownerAvatarUrl: String?,
-    val languageText: String,
+    val language: String?,
     val stargazersCount: Long,
     val watchersCount: Long,
     val forksCount: Long,
@@ -31,15 +31,15 @@ data class RepositoryItem(
      * [android.os.Parcel]から各プロパティを復元する。
      *
      * 読み出す順序は[writeToParcel]の書き込み順序と一致させる必要がある。
-     * [writeToParcel]は[fullName]と[languageText]を非nullで書き込み、
-     * [ownerAvatarUrl]だけnullを許容する。この契約を根拠に、前二者は非null表明で読み出す。
+     * [writeToParcel]が非nullで書き込むのは[fullName]だけで、
+     * [ownerAvatarUrl]と[language]はnullを許容する。この契約を根拠に読み出す。
      *
      * @param parcel [writeToParcel]が書き込んだ内容を保持する[android.os.Parcel]
      */
     constructor(parcel: Parcel) : this(
         fullName = parcel.readString()!!,
         ownerAvatarUrl = parcel.readString(),
-        languageText = parcel.readString()!!,
+        language = parcel.readString(),
         stargazersCount = parcel.readLong(),
         watchersCount = parcel.readLong(),
         forksCount = parcel.readLong(),
@@ -52,7 +52,7 @@ data class RepositoryItem(
     ) {
         parcel.writeString(fullName)
         parcel.writeString(ownerAvatarUrl)
-        parcel.writeString(languageText)
+        parcel.writeString(language)
         parcel.writeLong(stargazersCount)
         parcel.writeLong(watchersCount)
         parcel.writeLong(forksCount)

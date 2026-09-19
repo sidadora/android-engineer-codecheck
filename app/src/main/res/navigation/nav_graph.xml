@@ -23,6 +23,10 @@
         <argument
             android:name="repositoryItem"
             app:argType="jp.co.yumemi.android.code_check.model.RepositoryItem" />
+        <!-- 表示中の結果を取得した時刻。後続の検索が完了しても変わらないよう引数で渡す。 -->
+        <argument
+            android:name="searchedAtMillis"
+            app:argType="long" />
     </fragment>
 
 </navigation>

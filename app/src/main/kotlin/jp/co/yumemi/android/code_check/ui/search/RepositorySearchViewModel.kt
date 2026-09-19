@@ -3,124 +3,144 @@
  */
 package jp.co.yumemi.android.code_check.ui.search
 
-import android.content.Context
-import android.util.Log
+import androidx.annotation.MainThread
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.android.Android
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.request.parameter
-import io.ktor.client.statement.HttpResponse
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.isSuccess
-import jp.co.yumemi.android.code_check.MainActivity.Companion.lastSearchDate
-import jp.co.yumemi.android.code_check.ui.search.RepositorySearchResult.FailureReason
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
-import org.json.JSONException
-import java.io.IOException
-import java.util.Date
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import jp.co.yumemi.android.code_check.CodeCheckApplication
+import jp.co.yumemi.android.code_check.data.FetchResult
+import jp.co.yumemi.android.code_check.data.GitHubRepository
+import jp.co.yumemi.android.code_check.model.RepositoryItem
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.util.UUID
 
-private const val TAG = "RepositorySearch"
+/** プロセス再生成をまたいで復元する、成功した検索条件。 */
+private const val KEY_EXECUTED_QUERY = "executedQuery"
 
 /**
- * GitHubのリポジトリ検索APIを呼び出し、結果を[RepositorySearchResult]として返す。
+ * 検索画面の状態を保持し、検索の実行と中断を制御する。
  *
- * レスポンスの解析と表示用データへの変換は[RepositoryResponseParser]に委譲する。
- *
- * @param context レスポンスの変換に使う[RepositoryResponseParser]の生成にのみ渡す
+ * [search]と要求IDの読み書きはメインスレッドからのみ行う契約とする。
+ * [viewModelScope]は`Dispatchers.Main.immediate`で動くため、追加の同期は行わない。
  */
 class RepositorySearchViewModel(
-    context: Context,
+    private val repository: GitHubRepository,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val responseParser = RepositoryResponseParser(context)
+    private val _uiState = MutableStateFlow(SearchUiState())
+    val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    /**
-     * [query]でGitHubのリポジトリを検索し、結果を返す。
-     *
-     * `runBlocking`を使っているため、結果を受け取るまで呼び出し元のスレッドをブロックする。
-     * 成功した場合のみ[lastSearchDate]を更新する。
-     * 通信の失敗、HTTPエラー、レスポンスが想定の形式でない場合は[RepositorySearchResult.Failure]を返し、
-     * 利用者へ伝える内容を選べるよう[RepositorySearchResult.FailureReason]で理由を区別する。
-     * それ以外の例外は呼び出し元へ伝播する。
-     *
-     * 空文字や空白のみの条件はAPIがエラーとして返すため、呼び出し前に検証しておくこと。
-     * この関数は[query]を正規化せず、渡された内容をそのまま`q`パラメータへ送る。
-     *
-     * @param query GitHubのリポジトリ検索APIの`q`パラメータに渡す検索条件
-     * @return 成功時は検索結果、失敗時は理由を伴う[RepositorySearchResult.Failure]
-     */
-    fun searchRepositories(query: String): RepositorySearchResult =
-        runBlocking {
-            // Todo : Issue #4,#6で検索処理をライフサイクルに対応するスコープへ移す。
-            return@runBlocking GlobalScope
-                .async {
-                    // クライアントを使うコルーチン内で生成し、useでどの経路でも終了処理を行う。
-                    HttpClient(Android).use { client ->
-                        try {
-                            val response: HttpResponse =
-                                client.get(
-                                    "https://api.github.com/search/repositories",
-                                ) {
-                                    header("Accept", "application/vnd.github.v3+json")
-                                    parameter("q", query)
-                                }
+    private var searchJob: Job? = null
 
-                            // expectSuccessは既定でfalseのため、HTTPエラーでも例外にならず本文が返る。
-                            if (!response.status.isSuccess()) {
-                                Log.w(TAG, "検索APIがエラーを返しました: ${response.status}")
-                                RepositorySearchResult.Failure(response.toFailureReason())
-                            } else {
-                                val repositories =
-                                    responseParser.parse(response.body<String>())
+    /** 実行中の検索を識別する。応答を反映する直前に照合する。 */
+    private var currentRequestId: String? = null
 
-                                lastSearchDate = Date()
-
-                                RepositorySearchResult.Success(repositories)
-                            }
-                        } catch (e: IOException) {
-                            Log.w(TAG, "検索の通信に失敗しました: ${e::class.java.simpleName}")
-                            RepositorySearchResult.Failure(FailureReason.NETWORK)
-                        } catch (e: JSONException) {
-                            Log.w(TAG, "検索結果の解析に失敗しました", e)
-                            RepositorySearchResult.Failure(FailureReason.RESPONSE_FORMAT)
-                        }
-                    }
-                }.await()
-        }
-}
-
-/**
- * HTTPエラーのレスポンスを、利用者へ伝える理由へ分類する。
- *
- * 403はレート制限以外の理由でも返るため、状態コードだけでは判別しない。
- * 422は検索条件の不正だけでなく要求が過剰な場合にも返るため、原因を特定せず
- * [FailureReason.REQUEST_REJECTED]として扱う。
- * 分類は状態コードとヘッダーだけで行い、レスポンス本文やメッセージ文字列は見ない。
- */
-private fun HttpResponse.toFailureReason(): FailureReason =
-    when {
-        status == HttpStatusCode.TooManyRequests -> FailureReason.RATE_LIMIT
-        status == HttpStatusCode.Forbidden && isRateLimited() -> FailureReason.RATE_LIMIT
-        status == HttpStatusCode.UnprocessableEntity -> FailureReason.REQUEST_REJECTED
-        status.value in 500..599 -> FailureReason.SERVER
-        else -> FailureReason.UNKNOWN
+    init {
+        // 成功した検索条件だけが保存されている。回転ではViewModelが残るためここは通らない。
+        savedStateHandle.get<String>(KEY_EXECUTED_QUERY)?.let(::startSearch)
     }
 
-/**
- * レート制限による拒否だと、ヘッダーから判断できるかどうかを返す。
- *
- * 回数の上限に達した場合は残りの要求数が0になり、待ち時間が示される場合はRetry-Afterが付く。
- * ただしRetry-Afterは必ず付くとは限らず、ヘッダーだけでは判別できないレート制限もある。
- * 判断できない場合にレート制限と決めつけないため、この関数はfalseを返し、
- * 呼び出し元は[FailureReason.UNKNOWN]として扱う。
- */
-private fun HttpResponse.isRateLimited(): Boolean {
-    val remainingRequests = headers["x-ratelimit-remaining"]
-    val retryAfter = headers[HttpHeaders.RetryAfter]
-    return remainingRequests == "0" || retryAfter != null
+    /**
+     * 検索条件を受け取って検索を開始する。
+     *
+     * 空文字・空白のみは通信せず、入力を促す通知だけを出す。このとき一覧・検索日時・
+     * 保存情報は変更しない。実行中の検索も中断しないため、その検索が後から失敗すると
+     * 入力を促す通知が失敗の通知へ置き換わることがある。
+     *
+     * @param query 入力欄の内容。有効な場合は正規化せずそのまま送信する
+     */
+    @MainThread
+    fun search(query: String) {
+        if (query.isBlank()) {
+            _uiState.update { it.copy(notification = SearchNotification.InputRequired(newId())) }
+            return
+        }
+        startSearch(query)
+    }
+
+    /** 表示できた通知を消費する。確認中に別の通知へ置き換わっていた場合は消費しない。 */
+    @MainThread
+    fun onNotificationShown(id: String) {
+        _uiState.update { if (it.notification?.id == id) it.copy(notification = null) else it }
+    }
+
+    @MainThread
+    private fun startSearch(query: String) {
+        val requestId = newId()
+        currentRequestId = requestId
+        searchJob?.cancel()
+
+        // 前の検索に関する未表示の通知は、新しい検索の開始時に取り下げる。
+        _uiState.value = SearchUiState(content = SearchContent.Loading(query))
+        // 結果が確定するまで復元対象を持たない。失敗しても以前の成功条件を復活させない。
+        savedStateHandle[KEY_EXECUTED_QUERY] = null
+
+        searchJob =
+            viewModelScope.launch {
+                val result = repository.searchRepositories(query)
+
+                // キャンセル後も通信や解析が最後まで走ることがあるため、反映の直前に確認する。
+                if (requestId != currentRequestId) return@launch
+                ensureActive()
+
+                applyResult(query, result)
+            }
+    }
+
+    @MainThread
+    private fun applyResult(
+        query: String,
+        result: FetchResult<List<RepositoryItem>>,
+    ) {
+        when (result) {
+            is FetchResult.Success -> {
+                savedStateHandle[KEY_EXECUTED_QUERY] = query
+                _uiState.value = SearchUiState(content = successContent(query, result.value))
+            }
+
+            is FetchResult.Failure ->
+                _uiState.value =
+                    SearchUiState(
+                        content = SearchContent.Failed,
+                        notification = SearchNotification.SearchFailed(newId(), result.reason),
+                    )
+        }
+    }
+
+    private fun successContent(
+        query: String,
+        items: List<RepositoryItem>,
+    ): SearchContent =
+        if (items.isEmpty()) {
+            SearchContent.Empty(query)
+        } else {
+            SearchContent.Success(items, System.currentTimeMillis())
+        }
+
+    private fun newId(): String = UUID.randomUUID().toString()
+
+    companion object {
+        val Factory: ViewModelProvider.Factory =
+            viewModelFactory {
+                initializer {
+                    val application =
+                        this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
+                                as CodeCheckApplication
+                    RepositorySearchViewModel(
+                        repository = application.gitHubRepository,
+                        savedStateHandle = createSavedStateHandle(),
+                    )
+                }
+            }
+    }
 }

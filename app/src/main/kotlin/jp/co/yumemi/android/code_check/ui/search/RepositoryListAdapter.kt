@@ -16,6 +16,12 @@ import jp.co.yumemi.android.code_check.model.RepositoryItem
 class RepositoryListAdapter(
     private val itemClickListener: OnItemClickListener,
 ) : ListAdapter<RepositoryItem, RepositoryListAdapter.ViewHolder>(repositoryDiffCallback) {
+    init {
+        // 一覧は状態の購読後に投入されるため、空のまま復元されるとスクロール位置が失われる。
+        // 1件以上そろうまでRecyclerViewの復元を待たせる。
+        stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
+    }
+
     class ViewHolder(
         private val binding: ItemRepositoryBinding,
     ) : RecyclerView.ViewHolder(binding.root) {

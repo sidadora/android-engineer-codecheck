@@ -10,192 +10,42 @@ import android.view.inputmethod.EditorInfo
 import androidx.annotation.StringRes
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import jp.co.yumemi.android.code_check.R
+import jp.co.yumemi.android.code_check.data.FailureReason
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBinding
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 import jp.co.yumemi.android.code_check.ui.common.AlertDialogFragment
-import jp.co.yumemi.android.code_check.ui.search.RepositorySearchResult.FailureReason
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-// 検索エラーの通知ダイアログを識別するタグ。重複表示の判定に使う。
-private const val SEARCH_ERROR_DIALOG_TAG = "searchError"
-
-// 空文字、スペースで検索した際のアラートダイアログを識別するタグ
-private const val SEARCH_INPUT_REQUIRED_DIALOG_TAG = "searchInputRequired"
-
-/**
- * GitHubのリポジトリをキーワードで検索し、結果を一覧表示する画面。
- *
- * キーボードの検索キーで検索を実行し、一覧の項目を選択すると詳細画面へ遷移する。
- */
-class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
-    override fun onViewCreated(
-        view: View,
-        savedInstanceState: Bundle?,
-    ) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val binding = FragmentRepositorySearchBinding.bind(view)
-
-        val viewModel = RepositorySearchViewModel(requireContext())
-
-        val layoutManager = LinearLayoutManager(requireContext())
-
-        val dividerItemDecoration =
-            DividerItemDecoration(requireContext(), layoutManager.orientation)
-
-        val adapter =
-            RepositoryListAdapter(
-                object : RepositoryListAdapter.OnItemClickListener {
-                    override fun onItemClick(item: RepositoryItem) {
-                        navigateToRepositoryDetail(item)
-                    }
-                },
-            )
-
-        // 通信中に再度Enterを受け付けられるようになったため、多重実行を防ぐ。
-        var isSearching = false
-
-        fun search(query: String) {
-            // 空・空白のみはAPIがエラーとして返すため、通信する前に入力を促す。
-            // 検索を実行しないので、一覧も検索日時も変わらない。
-            if (query.isBlank()) {
-                showInputRequiredDialog()
-                return
-            }
-            if (isSearching) return
-
-            // searchRepositoriesは呼び出し元のスレッドをブロックするため、メインスレッドで
-            // 呼ぶと通信中に描画が進まず、この表示が出ないまま検索が終わってしまう。
-            isSearching = true
-            val hadNoResultMessage = binding.emptyResultText.isVisible
-            binding.emptyResultText.isVisible = false
-            binding.loadingIndicator.isVisible = true
-
-            viewLifecycleOwner.lifecycleScope.launch {
-                val result = withContext(Dispatchers.IO) { viewModel.searchRepositories(query) }
-
-                binding.loadingIndicator.isVisible = false
-                isSearching = false
-
-                // 失敗時は一覧も該当なしの表示も更新せず、前回の検索結果をそのまま残す。
-                when (result) {
-                    is RepositorySearchResult.Success -> {
-                        adapter.submitList(result.items)
-                        binding.emptyResultText.isVisible = result.items.isEmpty()
-                    }
-
-                    is RepositorySearchResult.Failure -> {
-                        binding.emptyResultText.isVisible = hadNoResultMessage
-                        showSearchErrorDialog(result.reason)
-                    }
-                }
-            }
-        }
-
-        binding.searchInputText
-            .setOnEditorActionListener { editText, actionId, event ->
-                when {
-                    // Android 14以降は単一行入力のEnterキーでもアクションIDが渡るため、
-                    // IMEの検索操作とEnterキーはイベントの有無で判別する。
-                    event == null -> {
-                        val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
-                        if (isSearchAction) search(editText.text.toString())
-                        isSearchAction
-                    }
-                    // Enterキーは押下・リピート・離すのそれぞれで呼ばれるため、最初の押下だけ検索する。
-                    // 残りも同じ操作の一部として消費し、二重実行と改行の入力を防ぐ。
-                    event.isEnterKey() -> {
-                        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                            search(editText.text.toString())
-                        }
-                        true
-                    }
-
-                    else -> false
-                }
-            }
-
-        binding.repositoryListView.also {
-            it.layoutManager = layoutManager
-            it.addItemDecoration(dividerItemDecoration)
-            it.adapter = adapter
-        }
-    }
-
-    /** 検索条件が未入力であることを知らせる。 */
-    private fun showInputRequiredDialog() {
-        showNotification(
-            tag = SEARCH_INPUT_REQUIRED_DIALOG_TAG,
-            titleRes = R.string.search_input_required_title,
-            messageRes = R.string.search_input_required_message,
-        )
-    }
-
-    /**
-     * 検索が失敗したことを、原因に応じた文言で知らせる。
-     *
-     * @param reason 検索が失敗した理由
-     */
-    private fun showSearchErrorDialog(reason: FailureReason) {
-        showNotification(
-            tag = SEARCH_ERROR_DIALOG_TAG,
-            titleRes = R.string.search_error_title,
-            messageRes = reason.messageRes(),
-        )
-    }
-
-    /**
-     * 閉じるだけで処理が進まない通知をダイアログで表示する。
-     *
-     * この画面のViewが表示状態でなければ通知しない。
-     * 詳細画面へ遷移するとこの画面のViewは破棄されるため、別画面にダイアログが出ることはない。
-     * 状態保存後などに破棄されても操作を妨げないため、表示の延期や再送は行わない。
-     */
-    private fun showNotification(
-        tag: String,
-        @StringRes titleRes: Int,
-        @StringRes messageRes: Int,
-    ) {
-        if (!viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
-
-        AlertDialogFragment.show(
-            fragmentManager = childFragmentManager,
-            tag = tag,
-            titleRes = titleRes,
-            messageRes = messageRes,
-        )
-    }
-
-    /**
-     * 詳細画面へ遷移する。
-     *
-     * @param item 詳細画面に表示するリポジトリ
-     */
-    private fun navigateToRepositoryDetail(item: RepositoryItem) {
-        val navController = findNavController()
-        // 連続タップ防止
-        // 遷移元にいるときだけ遷移し、詳細画面の重複と不正なaction指定による例外を防ぐ。
-        if (navController.currentDestination?.id != R.id.repository_search_fragment) return
-
-        val action =
-            RepositorySearchFragmentDirections
-                .actionRepositorySearchFragmentToRepositoryDetailFragment(repositoryItem = item)
-        navController.navigate(action)
-    }
-}
+// 通知ダイアログのタグ。同時に表示するのは1件だけなので、種類ごとには分けない。
+private const val NOTIFICATION_DIALOG_TAG = "searchNotification"
 
 /** Enterとして扱うキーコード。テンキーのEnterも同じ操作として扱う。 */
 private val enterKeyCodes = setOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
 
 private fun KeyEvent.isEnterKey(): Boolean = keyCode in enterKeyCodes
+
+@StringRes
+private fun SearchNotification.titleRes(): Int =
+    when (this) {
+        is SearchNotification.InputRequired -> R.string.search_input_required_title
+        is SearchNotification.SearchFailed -> R.string.search_error_title
+    }
+
+@StringRes
+private fun SearchNotification.messageRes(): Int =
+    when (this) {
+        is SearchNotification.InputRequired -> R.string.search_input_required_message
+        is SearchNotification.SearchFailed -> reason.messageRes()
+    }
 
 /**
  * 失敗の理由に対応する、利用者向けの文言を返す。
@@ -212,3 +62,186 @@ private fun FailureReason.messageRes(): Int =
         FailureReason.RESPONSE_FORMAT -> R.string.search_failure_response_format_message
         FailureReason.UNKNOWN -> R.string.search_failure_message
     }
+
+/**
+ * GitHubのリポジトリをキーワードで検索し、結果を一覧表示する画面。
+ *
+ * 入力イベントの受け取り、状態の描画、ダイアログ、画面遷移だけを担う。
+ * 検索の実行と状態の保持は[RepositorySearchViewModel]が持つ。
+ */
+class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
+    private val viewModel: RepositorySearchViewModel by viewModels {
+        RepositorySearchViewModel.Factory
+    }
+
+    /**
+     * 表示を要求済みで、まだFragmentManagerへ追加されていない通知の識別子。
+     *
+     * `show`のコミットは非同期のため、追加が完了するまで`findFragmentByTag`では拾えない。
+     * その隙間の重複要求を防ぐ。Viewの寿命で保持し、追加完了・ダイアログ除去・View破棄で解除する。
+     */
+    private var pendingNotificationId: String? = null
+
+    private var dialogRemovalCallbacks: FragmentManager.FragmentLifecycleCallbacks? = null
+
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
+        super.onViewCreated(view, savedInstanceState)
+
+        val binding = FragmentRepositorySearchBinding.bind(view)
+        val layoutManager = LinearLayoutManager(requireContext())
+        val adapter =
+            RepositoryListAdapter(
+                object : RepositoryListAdapter.OnItemClickListener {
+                    override fun onItemClick(item: RepositoryItem) {
+                        navigateToRepositoryDetail(item)
+                    }
+                },
+            )
+
+        binding.repositoryListView.also {
+            it.layoutManager = layoutManager
+            it.addItemDecoration(DividerItemDecoration(requireContext(), layoutManager.orientation))
+            it.adapter = adapter
+        }
+
+        binding.searchInputText.setOnEditorActionListener { editText, actionId, event ->
+            when {
+                // Android 14以降は単一行入力のEnterキーでもアクションIDが渡るため、
+                // IMEの検索操作とEnterキーはイベントの有無で判別する。
+                event == null -> {
+                    val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
+                    if (isSearchAction) viewModel.search(editText.text.toString())
+                    isSearchAction
+                }
+                // Enterキーは押下・リピート・離すのそれぞれで呼ばれるため、最初の押下だけ検索する。
+                // 残りも同じ操作の一部として消費し、二重実行と改行の入力を防ぐ。
+                event.isEnterKey() -> {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                        viewModel.search(editText.text.toString())
+                    }
+                    true
+                }
+
+                else -> false
+            }
+        }
+
+        observeDialogRemoval()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    render(binding, adapter, state.content)
+                    evaluateNotification(state.notification)
+                }
+            }
+        }
+    }
+
+    override fun onDestroyView() {
+        dialogRemovalCallbacks?.let(childFragmentManager::unregisterFragmentLifecycleCallbacks)
+        dialogRemovalCallbacks = null
+        pendingNotificationId = null
+        super.onDestroyView()
+    }
+
+    private fun render(
+        binding: FragmentRepositorySearchBinding,
+        adapter: RepositoryListAdapter,
+        content: SearchContent,
+    ) {
+        binding.loadingIndicator.isVisible = content is SearchContent.Loading
+        binding.emptyResultText.isVisible = content is SearchContent.Empty
+        // 実行中・失敗・未検索では一覧を空にし、前回の結果を残さない。
+        adapter.submitList((content as? SearchContent.Success)?.items.orEmpty())
+    }
+
+    /**
+     * ダイアログがFragmentManagerから外れたときに、保留中の通知を再評価する。
+     *
+     * 肯定ボタンや`onCancel`の結果は除去より前に届くため、それを合図にすると
+     * まだ表示中だと誤判定する。除去の完了を検知できる`onFragmentDetached`を使う。
+     */
+    private fun observeDialogRemoval() {
+        val callbacks =
+            object : FragmentManager.FragmentLifecycleCallbacks() {
+                override fun onFragmentDetached(
+                    fragmentManager: FragmentManager,
+                    fragment: Fragment,
+                ) {
+                    if (fragment !is AlertDialogFragment) return
+                    if (fragment.tag != NOTIFICATION_DIALOG_TAG) return
+
+                    // 除去されたダイアログの通知だけを解除し、別の予約は残す。
+                    if (fragment.notificationId == pendingNotificationId) {
+                        pendingNotificationId = null
+                    }
+                    evaluateNotification(viewModel.uiState.value.notification)
+                }
+            }
+        childFragmentManager.registerFragmentLifecycleCallbacks(callbacks, false)
+        dialogRemovalCallbacks = callbacks
+    }
+
+    private fun evaluateNotification(notification: SearchNotification?) {
+        val shownId =
+            (childFragmentManager.findFragmentByTag(NOTIFICATION_DIALOG_TAG) as? AlertDialogFragment)
+                ?.notificationId
+        // 追加が完了したら予約を解除する。
+        if (shownId != null && shownId == pendingNotificationId) pendingNotificationId = null
+
+        if (notification == null) return
+        val occupiedId = shownId ?: pendingNotificationId
+
+        when {
+            // 同じ通知が表示中・予約中なら処理済みとして扱う。
+            occupiedId == notification.id -> viewModel.onNotificationShown(notification.id)
+
+            // 別の通知が表示中・予約中の間は消費しない。除去されたときに再評価する。
+            occupiedId != null -> Unit
+
+            else -> showNotification(notification)
+        }
+    }
+
+    private fun showNotification(notification: SearchNotification) {
+        val issued =
+            AlertDialogFragment.show(
+                fragmentManager = childFragmentManager,
+                tag = NOTIFICATION_DIALOG_TAG,
+                titleRes = notification.titleRes(),
+                messageRes = notification.messageRes(),
+                notificationId = notification.id,
+            )
+        // 表示を要求できたときだけ消費する。状態保存後などで見送った場合は保持したままにする。
+        if (!issued) return
+
+        pendingNotificationId = notification.id
+        viewModel.onNotificationShown(notification.id)
+    }
+
+    /**
+     * 詳細画面へ遷移する。
+     *
+     * 表示中の一覧を取得した時刻も渡し、後続の検索が完了しても変わらないようにする。
+     */
+    private fun navigateToRepositoryDetail(item: RepositoryItem) {
+        val content = viewModel.uiState.value.content
+        if (content !is SearchContent.Success) return
+
+        val navController = findNavController()
+        // 遷移元にいるときだけ遷移し、連続タップによる重複と不正なaction指定を防ぐ。
+        if (navController.currentDestination?.id != R.id.repository_search_fragment) return
+
+        val action =
+            RepositorySearchFragmentDirections
+                .actionRepositorySearchFragmentToRepositoryDetailFragment(
+                    repositoryItem = item,
+                    searchedAtMillis = content.searchedAtMillis,
+                )
+        navController.navigate(action)
+    }
+}

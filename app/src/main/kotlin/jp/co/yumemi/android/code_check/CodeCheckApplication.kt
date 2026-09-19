@@ -4,6 +4,12 @@ import android.app.Application
 import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.android.Android
+import jp.co.yumemi.android.code_check.data.DefaultGitHubRepository
+import jp.co.yumemi.android.code_check.data.GitHubApi
+import jp.co.yumemi.android.code_check.data.GitHubRepository
+import jp.co.yumemi.android.code_check.data.RepositoryResponseParser
 import okhttp3.OkHttpClient
 import okhttp3.tls.HandshakeCertificates
 import java.security.cert.CertificateFactory
@@ -14,13 +20,30 @@ import java.security.cert.X509Certificate
 private const val MAX_SDK_WITHOUT_ISRG_ROOT_X1 = Build.VERSION_CODES.N
 
 /**
- * アプリ全体で共有する[ImageLoader]を提供する。
+ * アプリ全体で共有する依存を組み立てて保持する。
  *
  * [ImageLoader]はメモリ・ディスクキャッシュと接続プールを持つため、1つだけ生成して共有する。
  */
 class CodeCheckApplication :
     Application(),
     ImageLoaderFactory {
+    /**
+     * API通信に使うクライアント。
+     *
+     * 寿命はプロセスと同じで、明示的なcloseは行わない。`onTerminate`は実機で
+     * 呼ばれる保証がないため、解放の根拠にしない。
+     * 画像取得のクライアントとは別で、画像用の追加CA設定はここへ流用しない。
+     */
+    private val httpClient: HttpClient by lazy { HttpClient(Android) }
+
+    /** 画面が使うデータ取得の窓口。アプリ内で共有する。 */
+    val gitHubRepository: GitHubRepository by lazy {
+        DefaultGitHubRepository(
+            api = GitHubApi(httpClient),
+            parser = RepositoryResponseParser(),
+        )
+    }
+
     override fun newImageLoader(): ImageLoader =
         ImageLoader
             .Builder(this)
