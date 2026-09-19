@@ -35,7 +35,7 @@ internal class RepositoryResponseParser(
         val root =
             try {
                 JSONObject(responseBody)
-            } catch (e: JSONException) {
+            } catch (_: JSONException) {
                 // JSONTokenerの例外メッセージには入力全体が含まれる。
                 // ログに本文が出ないよう、原因を連鎖させずメッセージを差し替える。
                 throw JSONException("レスポンス本文をJSONオブジェクトとして解析できません")

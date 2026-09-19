@@ -50,9 +50,16 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
         }
         binding.repositoryName.text = item.fullName
         binding.repositoryLanguage.text = item.languageText
-        binding.starCount.text = "${item.stargazersCount} stars"
-        binding.watcherCount.text = "${item.watchersCount} watchers"
-        binding.forkCount.text = "${item.forksCount} forks"
-        binding.openIssueCount.text = "${item.openIssuesCount} open issues"
+        binding.starCount.text =
+            getString(R.string.repository_stars_format, item.stargazersCount)
+        binding.watcherCount.text =
+            getString(R.string.repository_watchers_format, item.watchersCount)
+        binding.forkCount.text =
+            getString(R.string.repository_forks_format, item.forksCount)
+        binding.openIssueCount.text =
+            getString(
+                R.string.repository_open_issues_format,
+                item.openIssuesCount,
+            )
     }
 }

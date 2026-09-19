@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.util.Log
 import androidx.annotation.MainThread
 import androidx.annotation.StringRes
-import androidx.core.os.bundleOf
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.setFragmentResult
@@ -51,7 +50,7 @@ class AlertDialogFragment : DialogFragment() {
 
     private fun sendResult(result: String) {
         val requestKey = requireArguments().getString(KEY_REQUEST_KEY) ?: return
-        setFragmentResult(requestKey, bundleOf(KEY_RESULT to result))
+        setFragmentResult(requestKey, Bundle().apply { putString(KEY_RESULT, result) })
     }
 
     companion object {
@@ -96,13 +95,13 @@ class AlertDialogFragment : DialogFragment() {
             if (fragmentManager.findFragmentByTag(tag) != null) return
 
             val dialogArguments =
-                bundleOf(
-                    KEY_TITLE to titleRes,
-                    KEY_MESSAGE to messageRes,
-                    KEY_POSITIVE_BUTTON to positiveButtonRes,
-                    KEY_CANCELABLE to cancelable,
-                    KEY_REQUEST_KEY to requestKey,
-                )
+                Bundle().apply {
+                    putInt(KEY_TITLE, titleRes)
+                    putInt(KEY_MESSAGE, messageRes)
+                    putInt(KEY_POSITIVE_BUTTON, positiveButtonRes)
+                    putBoolean(KEY_CANCELABLE, cancelable)
+                    putString(KEY_REQUEST_KEY, requestKey)
+                }
             if (negativeButtonRes != null) {
                 dialogArguments.putInt(KEY_NEGATIVE_BUTTON, negativeButtonRes)
             }

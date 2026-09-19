@@ -49,6 +49,7 @@ class RepositorySearchViewModel(
      */
     fun searchRepositories(query: String): RepositorySearchResult =
         runBlocking {
+            // Todo : Issue #4,#6で検索処理をライフサイクルに対応するスコープへ移す。
             return@runBlocking GlobalScope
                 .async {
                     // クライアントを使うコルーチン内で生成し、useでどの経路でも終了処理を行う。
