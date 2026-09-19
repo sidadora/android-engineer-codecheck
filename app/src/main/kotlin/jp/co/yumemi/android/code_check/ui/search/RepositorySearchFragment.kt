@@ -17,6 +17,7 @@ import jp.co.yumemi.android.code_check.R
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBinding
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 import jp.co.yumemi.android.code_check.ui.common.AlertDialogFragment
+import jp.co.yumemi.android.code_check.ui.search.RepositorySearchResult.FailureReason
 
 // 検索エラーの通知ダイアログを識別するタグ。重複表示の判定に使う。
 private const val SEARCH_ERROR_DIALOG_TAG = "searchError"
@@ -65,7 +66,7 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
             // 失敗時は一覧を更新せず、前回の検索結果をそのまま残す。
             when (val result = viewModel.searchRepositories(query)) {
                 is RepositorySearchResult.Success -> adapter.submitList(result.items)
-                RepositorySearchResult.Failure -> showSearchErrorDialog()
+                is RepositorySearchResult.Failure -> showSearchErrorDialog(result.reason)
             }
         }
 
@@ -108,12 +109,16 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         )
     }
 
-    /** 検索が失敗したことを知らせる。 */
-    private fun showSearchErrorDialog() {
+    /**
+     * 検索が失敗したことを、原因に応じた文言で知らせる。
+     *
+     * @param reason 検索が失敗した理由
+     */
+    private fun showSearchErrorDialog(reason: FailureReason) {
         showNotification(
             tag = SEARCH_ERROR_DIALOG_TAG,
             titleRes = R.string.search_error_title,
-            messageRes = R.string.search_failure_message,
+            messageRes = reason.messageRes(),
         )
     }
 
@@ -161,3 +166,19 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
 private val enterKeyCodes = setOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
 
 private fun KeyEvent.isEnterKey(): Boolean = keyCode in enterKeyCodes
+
+/**
+ * 失敗の理由に対応する、利用者向けの文言を返す。
+ *
+ * 次に取れる行動が伝わることを優先し、状態コードなどの内部の情報は含めない。
+ */
+@StringRes
+private fun FailureReason.messageRes(): Int =
+    when (this) {
+        FailureReason.NETWORK -> R.string.search_failure_network_message
+        FailureReason.RATE_LIMIT -> R.string.search_failure_rate_limit_message
+        FailureReason.REQUEST_REJECTED -> R.string.search_failure_request_rejected_message
+        FailureReason.SERVER -> R.string.search_failure_server_message
+        FailureReason.RESPONSE_FORMAT -> R.string.search_failure_response_format_message
+        FailureReason.UNKNOWN -> R.string.search_failure_message
+    }
