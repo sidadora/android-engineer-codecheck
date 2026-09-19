@@ -4,12 +4,11 @@
 package jp.co.yumemi.android.code_check
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import jp.co.yumemi.android.code_check.databinding.ItemRepositoryBinding
 
 /**
  * 検索結果のリポジトリを、リポジトリ名の一覧として表示するアダプター。
@@ -20,8 +19,16 @@ class RepositoryListAdapter(
     private val itemClickListener: OnItemClickListener,
 ) : ListAdapter<RepositoryItem, RepositoryListAdapter.ViewHolder>(repositoryDiffCallback) {
     class ViewHolder(
-        view: View,
-    ) : RecyclerView.ViewHolder(view)
+        private val binding: ItemRepositoryBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(
+            item: RepositoryItem,
+            itemClickListener: OnItemClickListener,
+        ) {
+            binding.repositoryName.text = item.fullName
+            binding.root.setOnClickListener { itemClickListener.onItemClick(item) }
+        }
+    }
 
     interface OnItemClickListener {
         /**
@@ -35,24 +42,18 @@ class RepositoryListAdapter(
     override fun onCreateViewHolder(
         parent: ViewGroup,
         viewType: Int,
-    ): ViewHolder {
-        val view =
-            LayoutInflater
-                .from(parent.context)
-                .inflate(R.layout.item_repository, parent, false)
-        return ViewHolder(view)
-    }
+    ): ViewHolder =
+        ViewHolder(
+            ItemRepositoryBinding.inflate(
+                LayoutInflater.from(parent.context), parent, false
+            ),
+        )
 
     override fun onBindViewHolder(
         holder: ViewHolder,
         position: Int,
     ) {
-        val item = getItem(position)
-        holder.itemView.findViewById<TextView>(R.id.repository_name).text = item.fullName
-
-        holder.itemView.setOnClickListener {
-            itemClickListener.onItemClick(item)
-        }
+        holder.bind(getItem(position), itemClickListener)
     }
 
     companion object {
