@@ -7,6 +7,8 @@
     <string name="repository_watchers_format">Watchers: %1$d</string>
     <string name="repository_forks_format">Forks: %1$d</string>
     <string name="repository_open_issues_format">Open issues: %1$d</string>
+    <string name="search_input_required_title">キーワードが未入力です</string>
+    <string name="search_input_required_message">検索したいキーワードを入力してください。</string>
     <string name="search_error_title">検索エラー</string>
     <string name="search_failure_message">検索結果を取得できませんでした。</string>
 </resources>
