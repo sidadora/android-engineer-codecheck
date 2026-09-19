@@ -57,6 +57,19 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/search_bar" />
 
+    <!-- 検索が実行されたことを伝えるため、通信中だけ表示する。 -->
+    <ProgressBar
+        android:id="@+id/loading_indicator"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/repository_list_view"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/repository_list_view"
+        tools:visibility="visible" />
+
     <!-- 一覧が空のままでは検索が終わったか判別できないため、該当0件のときだけ表示する。 -->
     <TextView
         android:id="@+id/empty_result_text"

@@ -11,6 +11,7 @@ import androidx.annotation.StringRes
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,6 +20,9 @@ import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBindi
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 import jp.co.yumemi.android.code_check.ui.common.AlertDialogFragment
 import jp.co.yumemi.android.code_check.ui.search.RepositorySearchResult.FailureReason
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // 検索エラーの通知ダイアログを識別するタグ。重複表示の判定に使う。
 private const val SEARCH_ERROR_DIALOG_TAG = "searchError"
@@ -56,6 +60,9 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
                 },
             )
 
+        // 通信中に再度Enterを受け付けられるようになったため、多重実行を防ぐ。
+        var isSearching = false
+
         fun search(query: String) {
             // 空・空白のみはAPIがエラーとして返すため、通信する前に入力を促す。
             // 検索を実行しないので、一覧も検索日時も変わらない。
@@ -63,15 +70,33 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
                 showInputRequiredDialog()
                 return
             }
+            if (isSearching) return
 
-            // 失敗時は一覧も該当なしの表示も更新せず、前回の検索結果をそのまま残す。
-            when (val result = viewModel.searchRepositories(query)) {
-                is RepositorySearchResult.Success -> {
-                    adapter.submitList(result.items)
-                    binding.emptyResultText.isVisible = result.items.isEmpty()
+            // searchRepositoriesは呼び出し元のスレッドをブロックするため、メインスレッドで
+            // 呼ぶと通信中に描画が進まず、この表示が出ないまま検索が終わってしまう。
+            isSearching = true
+            val hadNoResultMessage = binding.emptyResultText.isVisible
+            binding.emptyResultText.isVisible = false
+            binding.loadingIndicator.isVisible = true
+
+            viewLifecycleOwner.lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) { viewModel.searchRepositories(query) }
+
+                binding.loadingIndicator.isVisible = false
+                isSearching = false
+
+                // 失敗時は一覧も該当なしの表示も更新せず、前回の検索結果をそのまま残す。
+                when (result) {
+                    is RepositorySearchResult.Success -> {
+                        adapter.submitList(result.items)
+                        binding.emptyResultText.isVisible = result.items.isEmpty()
+                    }
+
+                    is RepositorySearchResult.Failure -> {
+                        binding.emptyResultText.isVisible = hadNoResultMessage
+                        showSearchErrorDialog(result.reason)
+                    }
                 }
-
-                is RepositorySearchResult.Failure -> showSearchErrorDialog(result.reason)
             }
         }
 
