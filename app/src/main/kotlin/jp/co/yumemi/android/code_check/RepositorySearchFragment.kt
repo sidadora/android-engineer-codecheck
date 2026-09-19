@@ -51,7 +51,9 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
                 val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
                 if (isSearchAction) {
                     // 失敗時は一覧を更新せず、前回の検索結果をそのまま残す。
-                    when (val result = viewModel.searchRepositories(editText.text.toString())) {
+                    when (
+                        val result = viewModel.searchRepositories(editText.text.toString())
+                    ) {
                         is RepositorySearchResult.Success -> adapter.submitList(result.items)
                         RepositorySearchResult.Failure -> showSearchErrorDialog()
                     }

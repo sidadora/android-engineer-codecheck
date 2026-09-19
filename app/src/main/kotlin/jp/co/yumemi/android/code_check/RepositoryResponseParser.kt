@@ -47,7 +47,9 @@ internal class RepositoryResponseParser(
             val value = jsonItems.opt(index)
             val jsonItem =
                 value.asJsonObjectOrNull()
-                    ?: throw JSONException("$itemPath: オブジェクトが必要です（実際は${value.jsonTypeName()}）")
+                    ?: throw JSONException(
+                        "$itemPath: オブジェクトが必要です（実際は${value.jsonTypeName()}）"
+                    )
             toRepositoryItem(jsonItem, itemPath)
         }
     }
@@ -73,10 +75,14 @@ internal class RepositoryResponseParser(
                 .requireNullableObject(itemPath, "owner")
                 ?.requireString("$itemPath.owner", "avatar_url")
         val language = jsonItem.requireNullableString(itemPath, "language")
-        val stargazersCount = jsonItem.requireCount(itemPath, "stargazers_count")
+        val stargazersCount = jsonItem.requireCount(
+            itemPath, "stargazers_count"
+        )
         val watchersCount = jsonItem.requireCount(itemPath, "watchers_count")
         val forksCount = jsonItem.requireCount(itemPath, "forks_count")
-        val openIssuesCount = jsonItem.requireCount(itemPath, "open_issues_count")
+        val openIssuesCount = jsonItem.requireCount(
+            itemPath, "open_issues_count"
+        )
 
         return RepositoryItem(
             fullName = fullName,
@@ -85,7 +91,9 @@ internal class RepositoryResponseParser(
                 if (language == null) {
                     context.getString(R.string.repository_language_unknown)
                 } else {
-                    context.getString(R.string.repository_language_format, language)
+                    context.getString(
+                        R.string.repository_language_format, language
+                    )
                 },
             stargazersCount = stargazersCount,
             watchersCount = watchersCount,

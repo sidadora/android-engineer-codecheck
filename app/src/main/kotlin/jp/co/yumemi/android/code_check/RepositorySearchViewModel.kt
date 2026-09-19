@@ -67,7 +67,8 @@ class RepositorySearchViewModel(
                                 Log.w(TAG, "検索APIがエラーを返しました: ${response.status}")
                                 RepositorySearchResult.Failure
                             } else {
-                                val repositories = responseParser.parse(response.body<String>())
+                                val repositories =
+                                    responseParser.parse(response.body<String>())
 
                                 lastSearchDate = Date()
 
