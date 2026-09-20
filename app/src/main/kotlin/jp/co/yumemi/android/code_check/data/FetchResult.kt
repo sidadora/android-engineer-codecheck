@@ -1,13 +1,19 @@
 package jp.co.yumemi.android.code_check.data
 
 /**
- * データ取得の結果。
+ * データ取得の成功値または失敗理由を表す。
  *
- * 取得できた値と、取得できなかった理由を区別する。
- * 該当0件のような正常な結果は[Success]の値として表し、失敗とは扱わない。
+ * 該当0件は成功として扱い、失敗と区別する。
+ *
+ * @param T 成功時に返すデータの型
  */
 sealed interface FetchResult<out T> {
-    /** 取得できた状態。 */
+
+    /**
+     * データ取得に成功した結果。
+     *
+     * @property value 取得したデータ
+     */
     data class Success<out T>(
         val value: T,
     ) : FetchResult<T>
@@ -23,11 +29,9 @@ sealed interface FetchResult<out T> {
 }
 
 /**
- * 取得に失敗した理由。
+ * データ取得の失敗理由。
  *
- * 利用者が次に取れる行動が変わるものだけを分ける。
- * 表示する文言の決定は画面側の責務とし、ここでは分類だけを持つ。
- * 検索と詳細取得の双方から参照する。
+ * 表示文言はUI側で決定し、ここでは分類だけを定義する。
  */
 enum class FailureReason {
     /** 接続できなかった、通信の途中で失敗した、またはタイムアウトした。 */

@@ -15,24 +15,21 @@ import okhttp3.tls.HandshakeCertificates
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 
-// ISRG Root X1がシステムの信頼ストアへ収録されたのはAndroid 7.1.1（API 25）から。
-// これ以下では収録されないため、画像取得のときだけ信頼アンカーとして補う。
+// API 24以下の端末向けに、画像取得でISRG Root X1を追加する。
 private const val MAX_SDK_WITHOUT_ISRG_ROOT_X1 = Build.VERSION_CODES.N
 
 /**
- * アプリ全体で共有する依存を組み立てて保持する。
+ * アプリ内で共有するAPIクライアントとRepositoryを組み立てて保持する。
  *
- * [ImageLoader]はメモリ・ディスクキャッシュと接続プールを持つため、1つだけ生成して共有する。
+ * Coilには、画像取得用の通信設定を適用したImageLoaderの生成方法を提供する。
  */
 class CodeCheckApplication :
     Application(),
     ImageLoaderFactory {
     /**
-     * API通信に使うクライアント。
+     * プロセスの存続中に共有するAPI通信クライアント。明示的なcloseは行わない。
      *
-     * 寿命はプロセスと同じで、明示的なcloseは行わない。`onTerminate`は実機で
-     * 呼ばれる保証がないため、解放の根拠にしない。
-     * 画像取得のクライアントとは別で、画像用の追加CA設定はここへ流用しない。
+     * 画像取得用のクライアントとは分け、画像用の追加CA設定は適用しない。
      */
     private val httpClient: HttpClient by lazy { HttpClient(Android) }
 
@@ -51,22 +48,22 @@ class CodeCheckApplication :
             .build()
 
     /**
-     * 画像取得に使う[OkHttpClient]を作る。
+     * 画像取得用のHTTPクライアントを生成する。
      *
-     * オーナーアイコンの配信元はISRG Root X1を信頼アンカーとする証明書を使う。
-     * 収録前のAndroidではシステムの信頼ストアだけでは検証できないため、
-     * そのバージョンに限りアンカーを追加する。
-     * システムの証明書による検証とOkHttp既定のホスト名検証は変更しない。
+     * API 24以下では、システムCAに加えて同梱のISRG Root X1を信頼する。
+     * ホスト名検証はOkHttpの既定設定を維持する。
      *
-     * この設定は画像取得のクライアント全体に適用され、特定のホストには限定していない。
-     * 検索APIの通信はKtorが別のクライアントで行うため、この設定の影響を受けない。
+     * 追加の信頼設定は画像取得クライアント全体に適用し、特定ホストには限定しない。
+     * 別クライアントを使う検索APIの通信には適用しない。
+     *
+     * @return API 24以下では追加CAを設定したクライアント、それ以外では既定設定のクライアント
      */
     private fun buildImageOkHttpClient(): OkHttpClient {
         if (Build.VERSION.SDK_INT > MAX_SDK_WITHOUT_ISRG_ROOT_X1) {
             return OkHttpClient()
         }
 
-        // システムの証明書を保ったまま、不足するアンカーだけを足す。
+        // システムの証明書を保ったまま、ISRG Root X1を追加する。
         val certificates =
             HandshakeCertificates
                 .Builder()
@@ -81,10 +78,11 @@ class CodeCheckApplication :
     }
 
     /**
-     * 同梱したISRG Root X1を読み出す。
+     * 同梱したISRG Root X1をX.509証明書として読み込む。
      *
-     * APKに含めた資源のため、失敗した場合はビルドの不備とみなして例外を伝播させる。
-     * 検証を緩める代替経路は用意しない。
+     * 読み込みや解析の失敗は呼び出し元へ伝播させ、検証を緩める代替処理は行わない。
+     *
+     * @return 同梱したISRG Root X1の証明書
      */
     private fun readIsrgRootX1(): X509Certificate =
         resources.openRawResource(R.raw.isrg_root_x1).use { input ->

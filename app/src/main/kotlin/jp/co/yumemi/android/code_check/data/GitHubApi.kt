@@ -1,3 +1,6 @@
+/*
+ * Copyright © 2021 YUMEMI Inc. All rights reserved.
+ */
 package jp.co.yumemi.android.code_check.data
 
 import android.util.Log
@@ -18,12 +21,12 @@ private const val BASE_URL = "https://api.github.com"
 private const val ACCEPT_GITHUB_JSON = "application/vnd.github.v3+json"
 
 /**
- * HTTPエラーのレスポンスを、利用者へ伝える理由へ分類する。
+ * HTTPステータスとヘッダーから失敗理由を分類する。
  *
- * 403はレート制限以外の理由でも返るため、状態コードだけでは判別しない。
- * 422は検索条件の不正だけでなく要求が過剰な場合にも返るため、原因を特定せず
- * [FailureReason.REQUEST_REJECTED]として扱う。
- * 分類は状態コードとヘッダーだけで行い、レスポンス本文やメッセージ文字列は見ない。
+ * 403はレート制限を示すヘッダーも確認し、422は原因を断定せず要求拒否として扱う。
+ * レスポンス本文は判定に使わない。
+ *
+ * @return 分類した失敗理由。判別できない場合は[FailureReason.UNKNOWN]
  */
 private fun HttpResponse.toFailureReason(): FailureReason =
     when {
@@ -35,12 +38,10 @@ private fun HttpResponse.toFailureReason(): FailureReason =
     }
 
 /**
- * レート制限による拒否だと、ヘッダーから判断できるかどうかを返す。
+ * 403レスポンスのヘッダーに、レート制限を示す情報があるかを判定する。
  *
- * 回数の上限に達した場合は残りの要求数が0になり、待ち時間が示される場合はRetry-Afterが付く。
- * ただしRetry-Afterは必ず付くとは限らず、ヘッダーだけでは判別できないレート制限もある。
- * 判断できない場合にレート制限と決めつけないため、この関数はfalseを返し、
- * 呼び出し元は[FailureReason.UNKNOWN]として扱う。
+ * @return 残り要求数が0、またはRetry-Afterがある場合はtrue。
+ *  falseでもレート制限ではないと断定できない
  */
 private fun HttpResponse.isRateLimited(): Boolean {
     val remainingRequests = headers["x-ratelimit-remaining"]
@@ -49,26 +50,37 @@ private fun HttpResponse.isRateLimited(): Boolean {
 }
 
 /**
- * GitHubのREST APIを呼び出し、レスポンス本文をそのまま返す。
+ * GitHub APIへ通信し、成功時のレスポンス本文または失敗理由を返す。
  *
- * 通信とHTTPの判定だけを担い、本文の解析は行わない。
- * 呼び出し元のコルーチンがキャンセルされた場合は[kotlinx.coroutines.CancellationException]を伝播させる。
+ * 本文の解析は行わず、キャンセルは呼び出し元へ伝播させる。
  *
- * @property httpClient 呼び出しに使うクライアント。寿命の管理は生成側が持つ
+ * @property httpClient 通信に使うクライアント。生成側が寿命を管理し、
+ *   HTTPエラーをステータスで判定できる設定にする
  */
 class GitHubApi(
     private val httpClient: HttpClient,
 ) {
     /**
-     * リポジトリを検索する。
+     * 検索条件を指定してリポジトリ検索APIを呼び出す。
      *
-     * @param query `q`パラメータへそのまま渡す検索条件。空文字や空白のみは呼び出し前に除くこと
+     * @param query qパラメータへ加工せず渡す検索条件。
+     *  空文字・空白のみの入力は呼び出し元で拒否すること
+     * @return 成功時は未解析のレスポンス本文、失敗時は通信またはHTTPエラーの分類
      */
     suspend fun searchRepositories(query: String): FetchResult<String> {
         val url = "$BASE_URL/search/repositories"
         return get(url) { parameter("q", query) }
     }
 
+    /**
+     * GETリクエストを送り、レスポンス本文または失敗理由を返す。
+     *
+     * IOExceptionは通信失敗へ変換し、キャンセルやその他の例外は伝播させる。
+     *
+     * @param url リクエスト先のURL
+     * @param configure クエリパラメータなど、リクエスト固有の設定
+     * @return 成功時は本文、失敗時は通信またはHTTPエラーの分類
+     */
     private suspend fun get(
         url: String,
         configure: HttpRequestBuilder.() -> Unit,
@@ -80,7 +92,7 @@ class GitHubApi(
                     configure()
                 }
 
-            // expectSuccessは既定でfalseのため、HTTPエラーでも例外にならず本文が返る。
+            // HTTPエラーを例外化しないクライアント設定を前提に、ステータスで成否を判定する。
             if (response.status.isSuccess()) {
                 FetchResult.Success(response.body<String>())
             } else {

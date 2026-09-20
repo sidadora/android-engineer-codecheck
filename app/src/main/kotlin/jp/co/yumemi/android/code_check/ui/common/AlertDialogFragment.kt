@@ -16,7 +16,15 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 private const val TAG = "AlertDialog"
 
-/** 必須IDの欠落・0は設定不備として扱う。 */
+/**
+ * 必須の文字列リソースIDを取得し、0でないことを確認する。
+ *
+ * リソースの存在や種類までは検証しない。
+ *
+ * @param key リソースIDを格納したキー
+ * @return 0以外のリソースID
+ * @throws IllegalArgumentException 取得したIDが0の場合。キーの欠落も含む
+ */
 @StringRes
 private fun Bundle.requireStringRes(key: String): Int {
     val resourceId = getInt(key, 0)
@@ -24,11 +32,25 @@ private fun Bundle.requireStringRes(key: String): Int {
     return resourceId
 }
 
+/**
+ * 必須キーの存在を確認し、Boolean値を取得する。
+ *
+ * @param key Boolean値を格納したキー
+ * @return 指定キーから読み出した値
+ * @throws IllegalArgumentException キーが存在しない場合
+ */
 private fun Bundle.requireBoolean(key: String): Boolean {
     require(containsKey(key)) { "ダイアログの$key が設定されていません" }
     return getBoolean(key)
 }
 
+/**
+ * 任意の文字列リソースIDを取得する。
+ *
+ * @param key リソースIDを格納したキー
+ * @return キーがなければnull、指定されていれば0以外のリソースID
+ * @throws IllegalArgumentException キーが存在するが、取得したIDが0の場合
+ */
 @StringRes
 private fun Bundle.optionalStringRes(key: String): Int? {
     if (!containsKey(key)) return null
@@ -36,10 +58,10 @@ private fun Bundle.optionalStringRes(key: String): Int? {
 }
 
 /**
- * 結果を通知するダイアログ。
+ * タイトル・本文・ボタンを引数で受け取り、通知を表示するダイアログ。
  *
- * どの通知に対して表示したかを[notificationId]で識別できる。復元後も引数から読めるため、
- * 呼び出し元は「今どの通知を表示中か」を判定できる。
+ * requestKeyが指定されている場合は、ボタン操作とキャンセルをFragment Resultで通知する。
+ * [notificationId]は引数に保持し、復元後も表示対象の通知を識別できる。
  */
 class AlertDialogFragment : DialogFragment() {
     /** この表示が対応する通知の識別子。通知を伴わない用途ではnull。 */
@@ -104,15 +126,22 @@ class AlertDialogFragment : DialogFragment() {
         private const val KEY_REQUEST_KEY = "requestKey"
 
         /**
-         * 同じタグのダイアログが無ければ表示を要求する。
+         * 同じタグのFragmentが存在せず、状態保存前の場合にダイアログの表示を要求する。
          *
-         * コミットは非同期のため、この関数が`true`を返した時点ではまだ追加されていない。
-         * 呼び出し元は追加が完了するまでの重複要求を自分で防ぐこと。
+         * メインスレッドから呼ぶこと。
+         * 追加は非同期のため、呼び出し元は追加が反映されるまでの重複要求を防ぐこと。
          *
-         * @param notificationId この表示が対応する通知の識別子
-         * @param negativeButtonRes nullなら否定ボタンを表示しない
-         * @param requestKey nullなら操作結果を通知しない
-         * @return 表示を要求できた場合はtrue。状態保存後や同じタグが既にある場合はfalse
+         * @param fragmentManager ダイアログを追加するFragmentManager
+         * @param tag 表示するダイアログを識別するタグ
+         * @param titleRes タイトルの文字列リソースID
+         * @param messageRes 本文の文字列リソースID
+         * @param positiveButtonRes 肯定ボタンの文字列リソースID。既定はOK
+         * @param negativeButtonRes 否定ボタンの文字列リソースID。nullの場合は表示しない
+         * @param cancelable 戻る操作などによるキャンセルを許可するか
+         * @param requestKey 操作結果を通知するFragment Resultのキー。nullの場合は通知しない
+         * @param notificationId 表示対象の通知ID。識別が不要な場合はnull
+         * @return 表示要求を発行した場合はtrue。状態保存後、または同じタグのFragmentが
+         *   存在する場合はfalse。trueは表示完了を意味しない
          */
         @MainThread
         fun show(
@@ -147,8 +176,8 @@ class AlertDialogFragment : DialogFragment() {
 
             val dialog = AlertDialogFragment()
             dialog.arguments = dialogArguments
-            // StateFlowの購読から呼ぶため、トランザクション実行中でないことを前提にできない。
-            // 同期コミットは使わず、非同期コミットで要求する。
+
+            // 呼び出し元でトランザクションが実行中の場合もあるため、追加は非同期で要求する。
             dialog.show(fragmentManager, tag)
             return true
         }

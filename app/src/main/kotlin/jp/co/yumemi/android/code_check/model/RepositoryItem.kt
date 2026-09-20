@@ -4,19 +4,19 @@ import android.os.Parcel
 import android.os.Parcelable
 
 /**
- * 画面に表示する1件のリポジトリ情報。
+ * 検索結果1件分のリポジトリ情報。
  *
- * 検索画面から詳細画面へNavigationの引数として渡すため[android.os.Parcelable]を実装する。
+ * 検索画面から詳細画面へNavigationの引数として渡すため、[Parcelable]を実装する。
  * このプロジェクトのビルド環境ではkotlin-parcelizeプラグインを有効にできなかったため
  * [android.os.Parcelable]を手動で実装している。
  *
  * @property fullName `owner/repo`形式のリポジトリ名
  * @property ownerAvatarUrl オーナーのアバター画像のURL。オーナー情報がない場合はnull
- * @property language GitHub APIの`language`の値。設定がない場合はnull
+ * @property language GitHub APIのlanguageの値。設定がない場合はnull
  * @property stargazersCount スター数
- * @property watchersCount GitHub APIの`watchers_count`の値
+ * @property watchersCount GitHub APIのwatchers_countの値
  * @property forksCount フォーク数
- * @property openIssuesCount GitHub APIの`open_issues_count`の値
+ * @property openIssuesCount GitHub APIのopen_issues_countの値
  */
 data class RepositoryItem(
     val fullName: String,

@@ -23,21 +23,29 @@ private const val TAG = "RepositoryDetail"
 class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
     private val args: RepositoryDetailFragmentArgs by navArgs()
 
+    /**
+     * Navigationの引数から詳細情報を表示し、オーナー画像の読み込みを開始する。
+     *
+     * 検索結果の取得日時はログへ出力する。
+     *
+     * @param view 詳細画面のルートView
+     * @param savedInstanceState 再生成時に渡される保存状態。初回生成時はnull
+     */
     override fun onViewCreated(
         view: View,
         savedInstanceState: Bundle?,
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 表示中の結果に対応する時刻。後続の検索が完了しても変わらない。
+        // 詳細の取得時刻ではなく、表示中の検索結果に対応する取得日時を記録する。
         Log.d(TAG, "検索日時: ${Date(args.searchedAtMillis)}")
 
-        // 表示の設定はこの中で完結し、View破棄後に参照しないためローカル変数で保持する。
+        // Bindingは初期表示の設定にだけ使い、Fragmentのフィールドには保持しない。
         val binding = FragmentRepositoryDetailBinding.bind(view)
 
         val item = args.repositoryItem
 
-        // オーナー情報がない場合に、無関係な既定画像を表示しないよう明示的に扱う。
+        // オーナー情報がない場合は、代替画像を表示せず画像を消す。
         val ownerAvatarUrl = item.ownerAvatarUrl
         if (ownerAvatarUrl != null) {
             binding.ownerIcon.load(ownerAvatarUrl)

@@ -10,20 +10,13 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-/**
- * JSONのnullと欠落をどちらもnullとして返す。
- *
- * `JSONObject.NULL`はtoString()が"null"を返すため、`optString`等では文字列"null"になってしまう。
- */
+/** JSONObject.NULLをKotlinのnullへ変換し、それ以外の値はそのまま返す。 */
 private fun Any?.asValueOrNull(): Any? = if (this == null || this == JSONObject.NULL) null else this
 
+/** 値がJSONObjectなら返し、nullまたは別の型ならnullを返す。 */
 private fun Any?.asJsonObjectOrNull(): JSONObject? = asValueOrNull() as? JSONObject
 
-/**
- * エラーメッセージに載せる型の名前。
- *
- * 値そのものは、想定外のオブジェクトがログへ展開されるのを避けるため含めない。
- */
+/** 値そのものを含めず、エラーメッセージ用の型名を返す。 */
 private fun Any?.jsonTypeName(): String =
     when (asValueOrNull()) {
         null -> "null"
@@ -36,13 +29,26 @@ private fun Any?.jsonTypeName(): String =
         else -> "不明な型"
     }
 
-/** エラーメッセージ用に、親のパスと項目名をつなぐ。 */
+/**
+ * エラーメッセージに使う項目のパスを組み立てる。
+ *
+ * @param parentPath 親要素のパス。ルートの場合は空文字
+ * @param name 項目名
+ * @return 親のパスと項目名をドットで連結した文字列。ルートの場合は項目名のみ
+ */
 private fun fieldPath(
     parentPath: String,
     name: String,
 ): String = if (parentPath.isEmpty()) name else "$parentPath.$name"
 
-/** 必須の文字列項目を取り出す。欠落・JSONのnull・文字列以外はいずれも異常として扱う。 */
+/**
+ * 必須の文字列項目を取得する。
+ *
+ * @param parentPath エラーメッセージに使う親要素のパス
+ * @param name 取得する項目名
+ * @return 項目の文字列
+ * @throws JSONException 項目が欠落している、JSONのnull、または文字列以外の場合
+ */
 private fun JSONObject.requireString(
     parentPath: String,
     name: String,
@@ -55,10 +61,15 @@ private fun JSONObject.requireString(
 }
 
 /**
- * 必須の件数項目を取り出す。
+ * 必須の件数項目を非負のLongとして取得する。
  *
- * IntとLongに解析された非負の値だけを受け入れる。
- * 小数・指数表記・Longの範囲外はDoubleとして解析されるため、値が変化しないよう異常として扱う。
+ * IntまたはLongの値だけを受け入れ、それ以外の型からの数値変換は行わない。
+ *
+ * @param parentPath エラーメッセージに使う親要素のパス
+ * @param name 取得する項目名
+ * @return 非負の件数
+ * @throws JSONException 項目が欠落している、JSONのnull、
+ *   Int・Long以外の型、または負の値の場合
  */
 private fun JSONObject.requireCount(
     parentPath: String,
@@ -76,7 +87,14 @@ private fun JSONObject.requireCount(
     return count
 }
 
-/** 必須の配列項目を取り出す。 */
+/**
+ * 必須の配列項目を取得する。
+ *
+ * @param parentPath エラーメッセージに使う親要素のパス
+ * @param name 取得する項目名
+ * @return 項目のJSON配列
+ * @throws JSONException 項目が欠落している、JSONのnull、または配列以外の場合
+ */
 private fun JSONObject.requireArray(
     parentPath: String,
     name: String,
@@ -89,9 +107,12 @@ private fun JSONObject.requireArray(
 }
 
 /**
- * 必須だがJSONのnullが許容される文字列項目を取り出す。
+ * JSONのnullを許容する必須のオブジェクト項目を取得する。
  *
- * キーの欠落は異常とし、JSONのnullはnullを返す。文字列以外の値は異常として扱う。
+ * @param parentPath エラーメッセージに使う親要素のパス
+ * @param name 取得する項目名
+ * @return 項目のJSONObject。JSONのnullの場合はnull
+ * @throws JSONException 項目が欠落している、またはオブジェクト・JSONのnull以外の場合
  */
 private fun JSONObject.requireNullableString(
     parentPath: String,
@@ -128,7 +149,7 @@ private fun JSONObject.requireNullableObject(
  */
 class RepositoryResponseParser {
     /**
-     * レスポンス本文を解析し、表示用の一覧へ変換する。
+     * レスポンス本文を検証し、リポジトリ一覧へ変換する。
      *
      * 必須項目の欠落・型違いは異常とみなし、空文字や0で補完しない。
      * 1件でも変換できない要素があれば例外とし、部分的な成功にはしない。
@@ -170,15 +191,15 @@ class RepositoryResponseParser {
     }
 
     /**
-     * 検索結果1件分のJSONを、表示用の[RepositoryItem]に変換する。
+     * 検索結果1件分のJSONを[RepositoryItem]へ変換する。
      *
-     * `owner`と`language`はAPIの契約でnullが許容されるため、正常な値として扱う。
-     * いずれもキー自体の欠落は異常とする。
+     * ownerとlanguageはJSONのnullを許容するが、キーの欠落は拒否する。
+     * ownerがオブジェクトの場合は、avatar_urlも検証する。
      *
-     * @param jsonItem リポジトリ検索APIのレスポンス内、`items`配列の1要素
-     * @param path エラーメッセージに含める、この要素の位置
-     * @return 画面表示に使う1件分のリポジトリ情報
-     * @throws JSONException 必須項目の欠落や型違いがある場合
+     * @param jsonItem items配列に含まれる1件分のJSONオブジェクト
+     * @param path エラーメッセージに使う要素の位置
+     * @return 検証済みのリポジトリ情報
+     * @throws JSONException 必須項目の欠落、許容しないnull、型違い、または不正な件数がある場合
      */
     private fun toRepositoryItem(
         jsonItem: JSONObject,

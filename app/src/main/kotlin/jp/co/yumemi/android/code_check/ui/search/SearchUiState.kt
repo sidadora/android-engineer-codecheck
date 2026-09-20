@@ -4,10 +4,10 @@ import jp.co.yumemi.android.code_check.data.FailureReason
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 
 /**
- * 検索画面の状態。
+ * 検索画面の表示と通知に使う状態。
  *
- * @property content 一覧まわりの表示内容
- * @property notification 未表示の通知。保持するのは最新の1件だけ
+ * @property content 検索の進行状況と結果。ローディング・一覧・該当なし表示を決める
+ * @property notification 未消費の通知。最新の1件だけを保持し、通知がなければnull
  */
 data class SearchUiState(
     val content: SearchContent = SearchContent.NotSearched,
@@ -15,12 +15,13 @@ data class SearchUiState(
 )
 
 /**
- * 一覧まわりの表示内容。
+ * 検索の進行状況と結果を表す状態。
  *
- * 初期表示と失敗を「該当0件」と混同しないよう、それぞれ別の状態として持つ。
+ * 未検索・実行中・成功・該当0件・失敗を区別する。
  */
 sealed interface SearchContent {
-    /** まだ一度も検索していない。 */
+
+    /** 検索中でも結果表示中でもない初期状態。復元する検索条件がない場合もこの状態になる。 */
     data object NotSearched : SearchContent
 
     /**
@@ -36,7 +37,7 @@ sealed interface SearchContent {
      * 1件以上取得できた状態。
      *
      * @property items APIが返した順序のままの一覧
-     * @property searchedAtMillis この一覧を取得した時刻。詳細画面へそのまま渡す
+     * @property searchedAtMillis 検索結果を取得した時刻。Unixエポックからのミリ秒で、詳細画面へ渡す
      */
     data class Success(
         val items: List<RepositoryItem>,
@@ -57,24 +58,30 @@ sealed interface SearchContent {
 }
 
 /**
- * 利用者へダイアログで伝える通知。
+ * ダイアログで伝える通知。
  *
- * [id]は表示中・表示予約中のダイアログと照合するために使う。
- * プロセス再生成で復元されたダイアログと新しい通知が衝突しないよう、
- * 連番ではなく再起動をまたいで重複しない値を使う。
+ * IDは表示中・表示予約中のダイアログとの照合に使う。
+ * 発行側は、プロセス再生成で復元された通知との衝突を避けるためUUIDを使う。
  */
 sealed interface SearchNotification {
     val id: String
 
-    /** 検索条件が未入力だった。通信は行っていない。 */
+    /**
+     * 空文字・空白のみの入力に対して、入力を促す通知。
+     *
+     * この入力による検索は開始しない。既に実行中の検索は中断しない。
+     *
+     * @property id 通知を識別するID
+     */
     data class InputRequired(
         override val id: String,
     ) : SearchNotification
 
     /**
-     * 検索に失敗した。
+     * 検索の失敗を伝える通知。
      *
-     * @property reason 文言を選ぶための分類
+     * @property id 通知を識別するID
+     * @property reason 表示文言を選ぶための失敗理由
      */
     data class SearchFailed(
         override val id: String,
