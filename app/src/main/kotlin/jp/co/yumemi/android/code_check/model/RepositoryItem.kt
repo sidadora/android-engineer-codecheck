@@ -17,7 +17,6 @@ import android.os.Parcelable
  * @property ownerAvatarUrl オーナーのアバター画像のURL。オーナー情報がない場合はnull
  * @property language GitHub APIのlanguageの値。設定がない場合はnull
  * @property stargazersCount スター数
- * @property watchersCount GitHub APIのwatchers_countの値
  * @property forksCount フォーク数
  * @property openIssuesCount GitHub APIのopen_issues_countの値
  */
@@ -26,7 +25,6 @@ data class RepositoryItem(
     val ownerAvatarUrl: String?,
     val language: String?,
     val stargazersCount: Long,
-    val watchersCount: Long,
     val forksCount: Long,
     val openIssuesCount: Long,
 ) : Parcelable {
@@ -44,7 +42,6 @@ data class RepositoryItem(
         ownerAvatarUrl = parcel.readString(),
         language = parcel.readString(),
         stargazersCount = parcel.readLong(),
-        watchersCount = parcel.readLong(),
         forksCount = parcel.readLong(),
         openIssuesCount = parcel.readLong(),
     )
@@ -57,7 +54,6 @@ data class RepositoryItem(
         parcel.writeString(ownerAvatarUrl)
         parcel.writeString(language)
         parcel.writeLong(stargazersCount)
-        parcel.writeLong(watchersCount)
         parcel.writeLong(forksCount)
         parcel.writeLong(openIssuesCount)
     }

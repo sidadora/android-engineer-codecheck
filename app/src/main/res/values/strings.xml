@@ -17,4 +17,9 @@
     <string name="search_failure_request_rejected_message">検索リクエストが受け付けられませんでした。検索条件を確認するか、しばらく待ってからお試しください。</string>
     <string name="search_failure_server_message">サーバーからエラーの応答がありました。しばらく待ってからお試しください。</string>
     <string name="search_failure_response_format_message">検索結果の内容を読み取れませんでした。しばらく待ってからお試しください。</string>
+    <string name="repository_watchers_loading">Watchers: 取得中</string>
+    <string name="repository_watchers_unavailable">Watchers: 取得できませんでした</string>
+    <string name="detail_error_title">取得エラー</string>
+    <string name="detail_watchers_failure_message">Watcher数を取得できませんでした。他の情報は表示されています。</string>
+    <string name="detail_watchers_failure_rate_limit_message">GitHub APIの利用が一時的に制限されているため、Watcher数を取得できませんでした。時間をおいて再度開いてください。</string>
 </resources>

@@ -244,7 +244,6 @@ class RepositoryResponseParser {
                 ?.requireString("$path.owner", "avatar_url")
         val language = jsonItem.requireNullableString(path, "language")
         val stargazersCount = jsonItem.requireCount(path, "stargazers_count")
-        val watchersCount = jsonItem.requireCount(path, "watchers_count")
         val forksCount = jsonItem.requireCount(path, "forks_count")
         val openIssuesCount = jsonItem.requireCount(path, "open_issues_count")
 
@@ -253,7 +252,6 @@ class RepositoryResponseParser {
             ownerAvatarUrl = ownerAvatarUrl,
             language = language,
             stargazersCount = stargazersCount,
-            watchersCount = watchersCount,
             forksCount = forksCount,
             openIssuesCount = openIssuesCount,
         )
