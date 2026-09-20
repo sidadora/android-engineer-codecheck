@@ -8,7 +8,6 @@ package jp.co.yumemi.android.code_check.data
  * @param T 成功時に返すデータの型
  */
 sealed interface FetchResult<out T> {
-
     /**
      * データ取得に成功した結果。
      *

@@ -44,10 +44,10 @@ class RepositorySearchViewModel(
     /** 画面の描画と通知に使う、読み取り専用の検索状態。 */
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    /** 最新の検索要求のID。古い応答の反映を防ぐために使う。 */
+    /** 前の検索へキャンセルを要求するためのJob。即時停止を保証するものではない。 */
     private var searchJob: Job? = null
 
-    /** 実行中の検索を識別する。応答を反映する直前に照合する。 */
+    /** 最新の検索要求のID。古い応答の反映を防ぐために使う。 */
     private var currentRequestId: String? = null
 
     init {

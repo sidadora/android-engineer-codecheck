@@ -107,12 +107,14 @@ private fun JSONObject.requireArray(
 }
 
 /**
- * JSONのnullを許容する必須のオブジェクト項目を取得する。
+ * 必須の文字列項目を取得する。
+ *
+ * JSONのnullはKotlinのnullとして返す。
  *
  * @param parentPath エラーメッセージに使う親要素のパス
  * @param name 取得する項目名
- * @return 項目のJSONObject。JSONのnullの場合はnull
- * @throws JSONException 項目が欠落している、またはオブジェクト・JSONのnull以外の場合
+ * @return 項目の文字列。JSONのnullの場合はnull
+ * @throws JSONException 項目が欠落している、または文字列・JSONのnull以外の場合
  */
 private fun JSONObject.requireNullableString(
     parentPath: String,
@@ -126,9 +128,14 @@ private fun JSONObject.requireNullableString(
 }
 
 /**
- * 必須だがJSONのnullが許容されるオブジェクト項目を取り出す。
+ * 必須のオブジェクト項目を取得する。
  *
- * キーの欠落は異常とし、JSONのnullはnullを返す。オブジェクト以外の値は異常として扱う。
+ * JSONのnullはKotlinのnullとして返す。
+ *
+ * @param parentPath エラーメッセージに使う親要素のパス
+ * @param name 取得する項目名
+ * @return 項目のJSONObject。JSONのnullの場合はnull
+ * @throws JSONException 項目が欠落している、またはJSONObject・JSONのnull以外の場合
  */
 private fun JSONObject.requireNullableObject(
     parentPath: String,

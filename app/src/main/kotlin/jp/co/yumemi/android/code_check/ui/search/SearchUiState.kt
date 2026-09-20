@@ -20,7 +20,6 @@ data class SearchUiState(
  * 未検索・実行中・成功・該当0件・失敗を区別する。
  */
 sealed interface SearchContent {
-
     /** 検索中でも結果表示中でもない初期状態。復元する検索条件がない場合もこの状態になる。 */
     data object NotSearched : SearchContent
 
