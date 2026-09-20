@@ -54,7 +54,7 @@ class RepositoryResponseParserTest {
     // ---- parse: 正常系 ----
 
     @Test
-    fun `正常な1件を全項目そろったRepositoryItemへ変換する`() =
+    fun `正常な1件を全項目そろった RepositoryItem へ変換する`() =
         runTest {
             val actual = parser.parse(itemsOf(VALID_ITEM))
 
@@ -74,13 +74,13 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `itemsが空配列なら空のリストを返す`() =
+    fun `items が空配列なら空のリストを返す`() =
         runTest {
             assertEquals(emptyList<RepositoryItem>(), parser.parse("""{"items":[]}"""))
         }
 
     @Test
-    fun `複数件をAPIが返した順序のまま返す`() =
+    fun `複数件を API が返した順序のまま返す`() =
         runTest {
             val body =
                 itemsOf(
@@ -96,7 +96,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `ownerがJSONのnullならownerAvatarUrlをnullにする`() =
+    fun `owner が JSON の null なら ownerAvatarUrl を null にする`() =
         runTest {
             val body = itemsOf(VALID_ITEM.replace(VALID_OWNER, """"owner": null"""))
 
@@ -104,7 +104,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `languageがJSONのnullならlanguageをnullにする`() =
+    fun `language が JSON の null なら language を null にする`() =
         runTest {
             val body = itemsOf(VALID_ITEM.replace(""""language": "Kotlin"""", """"language": null"""))
 
@@ -114,7 +114,7 @@ class RepositoryResponseParserTest {
     // ---- parse: 必須項目の欠落 ----
 
     @Test
-    fun `itemsキーがなければ失敗する`() =
+    fun `items キーがなければ失敗する`() =
         runTest {
             val error = parseFailure("""{"total_count":0}""")
 
@@ -122,7 +122,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `full_nameキーがなければ失敗する`() =
+    fun `full_name キーがなければ失敗する`() =
         runTest {
             val error = parseFailure(itemsOf(VALID_ITEM.replace(""""full_name": "JetBrains/kotlin",""", "")))
 
@@ -130,7 +130,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `ownerキーがなければ失敗する`() =
+    fun `owner キーがなければ失敗する`() =
         runTest {
             val error = parseFailure(itemsOf(VALID_ITEM.replace("$VALID_OWNER,", "")))
 
@@ -138,7 +138,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `languageキーがなければ失敗する`() =
+    fun `language キーがなければ失敗する`() =
         runTest {
             val error = parseFailure(itemsOf(VALID_ITEM.replace(""""language": "Kotlin",""", "")))
 
@@ -146,7 +146,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `ownerがオブジェクトでもavatar_urlがなければ失敗する`() =
+    fun `owner がオブジェクトでも avatar_url がなければ失敗する`() =
         runTest {
             val error = parseFailure(itemsOf(VALID_ITEM.replace(""""avatar_url": "https://example.com/avatar.png"""", "")))
 
@@ -156,7 +156,7 @@ class RepositoryResponseParserTest {
     // ---- parse: 明示的なnull ----
 
     @Test
-    fun `full_nameがJSONのnullなら空文字で補完せず失敗する`() =
+    fun `full_name が JSON の null なら空文字で補完せず失敗する`() =
         runTest {
             val error = parseFailure(itemsOf(VALID_ITEM.replace(""""full_name": "JetBrains/kotlin"""", """"full_name": null""")))
 
@@ -166,7 +166,7 @@ class RepositoryResponseParserTest {
     // ---- parse: 型違い ----
 
     @Test
-    fun `itemsが配列でなければ失敗する`() =
+    fun `items が配列でなければ失敗する`() =
         runTest {
             val error = parseFailure("""{"items":{"full_name":"a/b"}}""")
 
@@ -174,7 +174,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `full_nameが文字列でなければ失敗する`() =
+    fun `full_name が文字列でなければ失敗する`() =
         runTest {
             val error = parseFailure(itemsOf(VALID_ITEM.replace(""""full_name": "JetBrains/kotlin"""", """"full_name": 100""")))
 
@@ -182,7 +182,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `ownerがオブジェクトでもJSONのnullでもなければ失敗する`() =
+    fun `owner がオブジェクトでも JSON の null でもなければ失敗する`() =
         runTest {
             val body = itemsOf(VALID_ITEM.replace(VALID_OWNER, """"owner": "JetBrains""""))
 
@@ -192,7 +192,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `languageが文字列でもJSONのnullでもなければ失敗する`() =
+    fun `language が文字列でも JSON の null でもなければ失敗する`() =
         runTest {
             val error = parseFailure(itemsOf(VALID_ITEM.replace(""""language": "Kotlin"""", """"language": 100""")))
 
@@ -229,7 +229,7 @@ class RepositoryResponseParserTest {
     // ---- parse: 配列の要素 ----
 
     @Test
-    fun `itemsの要素がオブジェクトでなければ失敗する`() =
+    fun `items の要素がオブジェクトでなければ失敗する`() =
         runTest {
             val error = parseFailure("""{"items":["JetBrains/kotlin"]}""")
 
@@ -239,7 +239,7 @@ class RepositoryResponseParserTest {
     // ---- parse: 部分的な成功にしない ----
 
     @Test
-    fun `2件目が不正なら1件目だけを返さず失敗する`() =
+    fun `2 件目が不正なら 1 件目だけを返さず失敗する`() =
         runTest {
             val body =
                 itemsOf(
@@ -255,7 +255,7 @@ class RepositoryResponseParserTest {
     // ---- parse: レスポンス本文がJSONとして不正 ----
 
     @Test
-    fun `JSONとして解析できない本文なら失敗する`() =
+    fun `JSON として解析できない本文なら失敗する`() =
         runTest {
             val error = parseFailure("not json")
 
@@ -263,7 +263,7 @@ class RepositoryResponseParserTest {
         }
 
     @Test
-    fun `ルートがJSON配列なら失敗する`() =
+    fun `ルートが JSON 配列なら失敗する`() =
         runTest {
             val error = parseFailure("""[{"full_name":"a/b"}]""")
 
@@ -291,24 +291,24 @@ class RepositoryResponseParserTest {
     // ---- parseSubscribersCount ----
 
     @Test
-    fun `subscribers_countを購読者数として返す`() {
+    fun `subscribers_count を購読者数として返す`() {
         assertEquals(1489L, parser.parseSubscribersCount("""{"subscribers_count":1489}"""))
     }
 
     @Test
-    fun `subscribers_countが0でも正常な件数として返す`() {
+    fun `subscribers_count が 0 でも正常な件数として返す`() {
         assertEquals(0L, parser.parseSubscribersCount("""{"subscribers_count":0}"""))
     }
 
     @Test
-    fun `subscribers_countキーがなければ失敗する`() {
+    fun `subscribers_count キーがなければ失敗する`() {
         val error = subscribersCountFailure("""{"watchers_count":53434}""")
 
         assertTrue(error.message!!.contains("subscribers_count"))
     }
 
     @Test
-    fun `subscribers_countが負の値なら失敗する`() {
+    fun `subscribers_count が負の値なら失敗する`() {
         val error = subscribersCountFailure("""{"subscribers_count":-1}""")
 
         assertEquals("subscribers_count: 非負整数が必要です（負の値）", error.message)
