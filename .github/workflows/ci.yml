@@ -44,7 +44,7 @@ jobs:
           path: app/build/reports/ktlint/
           retention-days: 14
 
-  test:
+  unit-test:
     name: unit-test
     runs-on: ubuntu-latest
     timeout-minutes: 20
