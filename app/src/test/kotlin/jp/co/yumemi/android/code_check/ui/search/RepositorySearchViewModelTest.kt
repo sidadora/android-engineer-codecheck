@@ -10,6 +10,7 @@ import jp.co.yumemi.android.code_check.data.FakeRepositorySearchDataSource
 import jp.co.yumemi.android.code_check.data.FetchResult
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -23,6 +24,12 @@ import org.junit.Test
  * 本番側の保存キー。テストから参照できないため文字列で持ち、キーの変更も検知できるようにする。
  */
 private const val KEY_EXECUTED_QUERY = "executedQuery"
+
+/** 先に開始する検索。あとから完了させる側。 */
+private const val OLD_QUERY = "kotlin"
+
+/** あとから開始する検索。先に完了させる側。 */
+private const val NEW_QUERY = "python"
 
 /** 一覧の中身は検証対象ではないため、名前だけを変えた最小の値を使う。 */
 private fun repositoryItem(fullName: String): RepositoryItem =
@@ -337,5 +344,57 @@ class RepositorySearchViewModelTest {
             advanceUntilIdle()
 
             assertNull(executedQuery())
+        }
+
+    // ---- 検索の競合 ----
+
+    /**
+     * 2つの検索を完了させずに開始し、あとから開始した検索を先に完了させる。
+     *
+     * 古い検索が新しい検索より後に完了する状況を作る。
+     *
+     * @param oldResult 古い検索があとから返す結果
+     */
+    private fun TestScope.completeOldSearchLast(oldResult: FetchResult<List<RepositoryItem>>) {
+        repository.suspendOn(OLD_QUERY)
+        repository.suspendOn(NEW_QUERY)
+
+        viewModel.search(OLD_QUERY)
+        advanceUntilIdle()
+        viewModel.search(NEW_QUERY)
+        advanceUntilIdle()
+
+        repository.complete(NEW_QUERY, FetchResult.Success(listOf(repositoryItem("new/repo"))))
+        advanceUntilIdle()
+        repository.complete(OLD_QUERY, oldResult)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `古い検索があとから完了しても新しい検索の結果が残る`() =
+        runTest {
+            completeOldSearchLast(FetchResult.Success(listOf(repositoryItem("old/repo"))))
+
+            val content = viewModel.uiState.value.content
+            assertEquals(
+                listOf("new/repo"),
+                (content as SearchContent.Success).items.map { it.fullName },
+            )
+        }
+
+    @Test
+    fun `古い検索の失敗があとから届いても通知を発行しない`() =
+        runTest {
+            completeOldSearchLast(FetchResult.Failure(FailureReason.NETWORK))
+
+            assertNull(viewModel.uiState.value.notification)
+        }
+
+    @Test
+    fun `古い検索の成功があとから届いても保存した検索条件を上書きしない`() =
+        runTest {
+            completeOldSearchLast(FetchResult.Success(listOf(repositoryItem("old/repo"))))
+
+            assertEquals(NEW_QUERY, executedQuery())
         }
 }
