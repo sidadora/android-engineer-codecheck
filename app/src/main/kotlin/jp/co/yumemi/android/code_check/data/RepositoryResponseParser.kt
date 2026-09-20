@@ -149,7 +149,24 @@ private fun JSONObject.requireNullableObject(
 }
 
 /**
- * リポジトリ検索APIのレスポンスを検証し、[RepositoryItem]へ変換する。
+ * レスポンス本文をJSONオブジェクトとして解析する。
+ *
+ * [JSONObject]のコンストラクタが送出する例外のメッセージには入力全体が含まれる。
+ * ログへ本文が出ないよう、原因を連鎖させずメッセージを差し替える。
+ *
+ * @param responseBody APIのレスポンス本文
+ * @return 解析したJSONオブジェクト
+ * @throws JSONException 本文をJSONオブジェクトとして解析できない場合
+ */
+private fun parseRootObject(responseBody: String): JSONObject =
+    try {
+        JSONObject(responseBody)
+    } catch (_: JSONException) {
+        throw JSONException("レスポンス本文をJSONオブジェクトとして解析できません")
+    }
+
+/**
+ * GitHub APIのレスポンスを検証し、必要な値へ変換する。
  *
  * 表示用の文字列は組み立てず、データのまま返す。文言の決定は画面側の責務とする。
  * 解析できない場合は[JSONException]を送出し、結果型への変換は呼び出し元が行う。
@@ -169,14 +186,7 @@ class RepositoryResponseParser {
      * @throws JSONException レスポンスが想定の形式でない場合
      */
     suspend fun parse(responseBody: String): List<RepositoryItem> {
-        val root =
-            try {
-                JSONObject(responseBody)
-            } catch (_: JSONException) {
-                // JSONTokenerの例外メッセージには入力全体が含まれる。
-                // ログに本文が出ないよう、原因を連鎖させずメッセージを差し替える。
-                throw JSONException("レスポンス本文をJSONオブジェクトとして解析できません")
-            }
+        val root = parseRootObject(responseBody)
 
         val jsonItems = root.requireArray("", "items")
 
@@ -195,6 +205,21 @@ class RepositoryResponseParser {
             items += toRepositoryItem(jsonItem, path)
         }
         return items
+    }
+
+    /**
+     * リポジトリ詳細のレスポンス本文から、購読者数を取り出す。
+     *
+     * 検索APIの`watchers_count`はStar数と同じ値のため使わず、`subscribers_count`を使う。
+     * 欠落・型違い・負の値は異常として扱い、0で補完しない。0は正常な件数として返す。
+     *
+     * @param responseBody リポジトリ詳細APIのレスポンス本文
+     * @return 購読者数
+     * @throws JSONException レスポンスが想定の形式でない場合
+     */
+    fun parseSubscribersCount(responseBody: String): Long {
+        val root = parseRootObject(responseBody)
+        return root.requireCount("", "subscribers_count")
     }
 
     /**
@@ -219,7 +244,6 @@ class RepositoryResponseParser {
                 ?.requireString("$path.owner", "avatar_url")
         val language = jsonItem.requireNullableString(path, "language")
         val stargazersCount = jsonItem.requireCount(path, "stargazers_count")
-        val watchersCount = jsonItem.requireCount(path, "watchers_count")
         val forksCount = jsonItem.requireCount(path, "forks_count")
         val openIssuesCount = jsonItem.requireCount(path, "open_issues_count")
 
@@ -228,7 +252,6 @@ class RepositoryResponseParser {
             ownerAvatarUrl = ownerAvatarUrl,
             language = language,
             stargazersCount = stargazersCount,
-            watchersCount = watchersCount,
             forksCount = forksCount,
             openIssuesCount = openIssuesCount,
         )

@@ -28,10 +28,22 @@ interface GitHubRepository {
      * 該当0件は空の一覧、通信・HTTP・解析の失敗は[FetchResult.Failure]
      */
     suspend fun searchRepositories(query: String): FetchResult<List<RepositoryItem>>
+
+    /**
+     * [fullName]のリポジトリの購読者数を取得する。
+     *
+     * 検索APIが返す`watchers_count`はStar数と同じ値のため、この経路で取得する。
+     *
+     * @param fullName `owner/repo`形式のリポジトリ名
+     *
+     * @return 成功時は購読者数。0も正常な件数として返す。
+     * 通信・HTTP・解析の失敗は[FetchResult.Failure]
+     */
+    suspend fun getSubscribersCount(fullName: String): FetchResult<Long>
 }
 
 /**
- * APIから取得した本文を解析し、リポジトリ一覧へ変換する。
+ * APIから取得した本文を解析し、画面が使う値へ変換する。
  *
  * 通信・HTTPの失敗はそのまま返し、解析時のJSONExceptionは
  * [FailureReason.RESPONSE_FORMAT]へ変換する。キャンセルは伝播させる。
@@ -55,6 +67,21 @@ class DefaultGitHubRepository(
                     } catch (e: JSONException) {
                         // パーサーの例外にはレスポンス本文や項目の値を含めないため、そのまま記録する。
                         Log.w(TAG, "検索結果の解析に失敗しました", e)
+                        FetchResult.Failure(FailureReason.RESPONSE_FORMAT)
+                    }
+                }
+        }
+
+    override suspend fun getSubscribersCount(fullName: String): FetchResult<Long> =
+        when (val response = api.getRepository(fullName)) {
+            is FetchResult.Failure -> response
+            is FetchResult.Success ->
+                withContext(parseDispatcher) {
+                    try {
+                        FetchResult.Success(parser.parseSubscribersCount(response.value))
+                    } catch (e: JSONException) {
+                        // パーサーの例外にはレスポンス本文や項目の値を含めないため、そのまま記録する。
+                        Log.w(TAG, "リポジトリ詳細の解析に失敗しました", e)
                         FetchResult.Failure(FailureReason.RESPONSE_FORMAT)
                     }
                 }

@@ -73,6 +73,19 @@ class GitHubApi(
     }
 
     /**
+     * リポジトリ1件の詳細を取得する。
+     *
+     * 検索APIのレスポンスには`subscribers_count`が含まれないため、この経路で取得する。
+     *
+     * @param fullName `owner/repo`形式のリポジトリ名。APIが返した値をそのまま使うこと
+     * @return 成功時は未解析のレスポンス本文、失敗時は通信またはHTTPエラーの分類
+     */
+    suspend fun getRepository(fullName: String): FetchResult<String> {
+        val url = "$BASE_URL/repos/$fullName"
+        return get(url) {}
+    }
+
+    /**
      * GETリクエストを送り、レスポンス本文または失敗理由を返す。
      *
      * IOExceptionは通信失敗へ変換し、キャンセルやその他の例外は伝播させる。
