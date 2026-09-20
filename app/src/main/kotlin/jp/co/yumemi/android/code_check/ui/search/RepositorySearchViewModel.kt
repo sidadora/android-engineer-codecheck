@@ -13,7 +13,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import jp.co.yumemi.android.code_check.CodeCheckApplication
 import jp.co.yumemi.android.code_check.data.FetchResult
-import jp.co.yumemi.android.code_check.data.GitHubRepository
+import jp.co.yumemi.android.code_check.data.RepositorySearchDataSource
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -36,7 +36,7 @@ private const val KEY_EXECUTED_QUERY = "executedQuery"
  * @property savedStateHandle プロセス再生成後の再検索に使う検索条件の保存先
  */
 class RepositorySearchViewModel(
-    private val repository: GitHubRepository,
+    private val repository: RepositorySearchDataSource,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -171,7 +171,7 @@ class RepositorySearchViewModel(
                         this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                             as CodeCheckApplication
                     RepositorySearchViewModel(
-                        repository = application.gitHubRepository,
+                        repository = application.repositorySearchDataSource,
                         savedStateHandle = createSavedStateHandle(),
                     )
                 }

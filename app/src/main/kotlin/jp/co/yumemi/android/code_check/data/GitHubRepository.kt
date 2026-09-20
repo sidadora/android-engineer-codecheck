@@ -13,11 +13,11 @@ import org.json.JSONException
 private const val TAG = "GitHubRepository"
 
 /**
- * リポジトリ情報を取得する窓口。
+ * 検索画面が使うデータ取得の窓口。
  *
  * 呼び出し元から通信と解析の詳細を隠し、取得結果を[FetchResult]で返す。
  */
-interface GitHubRepository {
+interface RepositorySearchDataSource {
     /**
      * 指定した条件でリポジトリを検索する。
      *
@@ -28,7 +28,14 @@ interface GitHubRepository {
      * 該当0件は空の一覧、通信・HTTP・解析の失敗は[FetchResult.Failure]
      */
     suspend fun searchRepositories(query: String): FetchResult<List<RepositoryItem>>
+}
 
+/**
+ * 詳細画面が使うデータ取得の窓口。
+ *
+ * 呼び出し元から通信と解析の詳細を隠し、取得結果を[FetchResult]で返す。
+ */
+interface RepositoryDetailDataSource {
     /**
      * [fullName]のリポジトリの購読者数を取得する。
      *
@@ -56,7 +63,8 @@ class DefaultGitHubRepository(
     private val api: GitHubApi,
     private val parser: RepositoryResponseParser,
     private val parseDispatcher: CoroutineDispatcher = Dispatchers.Default,
-) : GitHubRepository {
+) : RepositorySearchDataSource,
+    RepositoryDetailDataSource {
     override suspend fun searchRepositories(query: String): FetchResult<List<RepositoryItem>> =
         when (val response = api.searchRepositories(query)) {
             is FetchResult.Failure -> response
