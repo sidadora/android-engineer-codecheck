@@ -24,22 +24,27 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-/** プロセス再生成をまたいで復元する、成功した検索条件。 */
+/** プロセス再生成後の再検索に使う、成功時の検索条件の保存キー。 */
 private const val KEY_EXECUTED_QUERY = "executedQuery"
 
 /**
- * 検索画面の状態を保持し、検索の実行と中断を制御する。
+ * 検索処理と画面状態を管理する。
  *
- * [search]と要求IDの読み書きはメインスレッドからのみ行う契約とする。
- * [viewModelScope]は`Dispatchers.Main.immediate`で動くため、追加の同期は行わない。
+ * 状態と要求IDの更新はメインスレッドで行う。
+ *
+ * @property repository リポジトリ情報の取得先
+ * @property savedStateHandle プロセス再生成後の再検索に使う検索条件の保存先
  */
 class RepositorySearchViewModel(
     private val repository: GitHubRepository,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
+
+    /** 画面の描画と通知に使う、読み取り専用の検索状態。 */
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
+    /** 最新の検索要求のID。古い応答の反映を防ぐために使う。 */
     private var searchJob: Job? = null
 
     /** 実行中の検索を識別する。応答を反映する直前に照合する。 */
@@ -51,13 +56,11 @@ class RepositorySearchViewModel(
     }
 
     /**
-     * 検索条件を受け取って検索を開始する。
+     * 入力を検証し、検索を開始する。
      *
-     * 空文字・空白のみは通信せず、入力を促す通知だけを出す。このとき一覧・検索日時・
-     * 保存情報は変更しない。実行中の検索も中断しないため、その検索が後から失敗すると
-     * 入力を促す通知が失敗の通知へ置き換わることがある。
+     * 空文字・空白のみの場合は入力案内を通知し、検索状態・保存情報・実行中の検索は変更しない。
      *
-     * @param query 入力欄の内容。有効な場合は正規化せずそのまま送信する
+     * @param query 入力欄の内容。空白のみでなければ加工せず送信する
      */
     @MainThread
     fun search(query: String) {
@@ -68,12 +71,26 @@ class RepositorySearchViewModel(
         startSearch(query)
     }
 
-    /** 表示できた通知を消費する。確認中に別の通知へ置き換わっていた場合は消費しない。 */
+    /**
+     * 表示中または表示要求済みの通知を消費する。
+     *
+     * 現在保持している通知とIDが一致する場合だけ消費し、別の通知は残す。
+     *
+     * @param id 表示中または表示要求済みの通知ID
+     */
     @MainThread
     fun onNotificationShown(id: String) {
         _uiState.update { if (it.notification?.id == id) it.copy(notification = null) else it }
     }
 
+    /**
+     * 前の検索へキャンセルを要求し、新しい検索を開始する。
+     *
+     * 未表示の通知と保存済みの検索条件を消し、検索中の状態へ切り替える。
+     * 結果を反映する直前に要求IDとキャンセル状態を確認する。
+     *
+     * @param query APIへ加工せず渡す、検証済みの検索条件
+     */
     @MainThread
     private fun startSearch(query: String) {
         val requestId = newId()
@@ -97,6 +114,15 @@ class RepositorySearchViewModel(
             }
     }
 
+    /**
+     * 検索結果を画面状態と保存情報へ反映する。
+     *
+     * 成功時は検索条件を保存し、失敗時は失敗状態と通知を設定する。
+     * 最新の検索要求であり、キャンセルされていないことを確認してから呼ぶ。
+     *
+     * @param query 結果に対応する検索条件
+     * @param result データ取得の成功値または失敗理由
+     */
     @MainThread
     private fun applyResult(
         query: String,
@@ -117,6 +143,13 @@ class RepositorySearchViewModel(
         }
     }
 
+    /**
+     * 成功した検索結果を、件数に応じた画面状態へ変換する。
+     *
+     * @param query 結果に対応する検索条件
+     * @param items 取得したリポジトリ一覧
+     * @return 0件の場合はEmpty、1件以上の場合は現在時刻を取得日時としたSuccess
+     */
     private fun successContent(
         query: String,
         items: List<RepositoryItem>,
@@ -127,6 +160,7 @@ class RepositorySearchViewModel(
             SearchContent.Success(items, System.currentTimeMillis())
         }
 
+    /** 検索要求と通知の識別に使うUUID文字列を生成する。 */
     private fun newId(): String = UUID.randomUUID().toString()
 
     companion object {

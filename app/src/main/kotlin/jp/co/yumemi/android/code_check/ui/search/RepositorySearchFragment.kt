@@ -10,7 +10,6 @@ import android.view.inputmethod.EditorInfo
 import androidx.annotation.StringRes
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -22,17 +21,18 @@ import jp.co.yumemi.android.code_check.R
 import jp.co.yumemi.android.code_check.data.FailureReason
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositorySearchBinding
 import jp.co.yumemi.android.code_check.model.RepositoryItem
-import jp.co.yumemi.android.code_check.ui.common.AlertDialogFragment
+import jp.co.yumemi.android.code_check.ui.common.NotificationDialogHost
 import kotlinx.coroutines.launch
 
-// 通知ダイアログのタグ。同時に表示するのは1件だけなので、種類ごとには分けない。
+/** 通知の種類によらず、共通のタグで重複表示を防ぐ。 */
 private const val NOTIFICATION_DIALOG_TAG = "searchNotification"
 
-/** Enterとして扱うキーコード。テンキーのEnterも同じ操作として扱う。 */
+/** 通常のEnterまたはテンキーのEnterかを判定する。 */
 private val enterKeyCodes = setOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
 
 private fun KeyEvent.isEnterKey(): Boolean = keyCode in enterKeyCodes
 
+/** 通知に対応するダイアログのタイトルのリソースIDを返す。 */
 @StringRes
 private fun SearchNotification.titleRes(): Int =
     when (this) {
@@ -40,6 +40,7 @@ private fun SearchNotification.titleRes(): Int =
         is SearchNotification.SearchFailed -> R.string.search_error_title
     }
 
+/** 通知に対応するダイアログの本文のリソースIDを返す。 */
 @StringRes
 private fun SearchNotification.messageRes(): Int =
     when (this) {
@@ -47,11 +48,7 @@ private fun SearchNotification.messageRes(): Int =
         is SearchNotification.SearchFailed -> reason.messageRes()
     }
 
-/**
- * 失敗の理由に対応する、利用者向けの文言を返す。
- *
- * 次に取れる行動が伝わることを優先し、状態コードなどの内部の情報は含めない。
- */
+/** 失敗理由に対応する案内文のリソースIDを返す。 */
 @StringRes
 private fun FailureReason.messageRes(): Int =
     when (this) {
@@ -64,26 +61,23 @@ private fun FailureReason.messageRes(): Int =
     }
 
 /**
- * GitHubのリポジトリをキーワードで検索し、結果を一覧表示する画面。
+ * 検索画面の入力・表示・画面遷移を担当する。
  *
- * 入力イベントの受け取り、状態の描画、ダイアログ、画面遷移だけを担う。
- * 検索の実行と状態の保持は[RepositorySearchViewModel]が持つ。
+ * 検索処理と状態管理は[RepositorySearchViewModel]へ委譲する。
  */
 class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
     private val viewModel: RepositorySearchViewModel by viewModels {
         RepositorySearchViewModel.Factory
     }
 
+    private var dialogHost: NotificationDialogHost? = null
+
     /**
-     * 表示を要求済みで、まだFragmentManagerへ追加されていない通知の識別子。
+     * 一覧と検索入力を設定し、検索状態の購読と通知ダイアログの監視を開始する。
      *
-     * `show`のコミットは非同期のため、追加が完了するまで`findFragmentByTag`では拾えない。
-     * その隙間の重複要求を防ぐ。Viewの寿命で保持し、追加完了・ダイアログ除去・View破棄で解除する。
+     * @param view 検索画面のルートView
+     * @param savedInstanceState 再生成時に渡される保存状態。初回生成時はnull
      */
-    private var pendingNotificationId: String? = null
-
-    private var dialogRemovalCallbacks: FragmentManager.FragmentLifecycleCallbacks? = null
-
     override fun onViewCreated(
         view: View,
         savedInstanceState: Bundle?,
@@ -129,7 +123,9 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
             }
         }
 
-        observeDialogRemoval()
+        val host = NotificationDialogHost(childFragmentManager, NOTIFICATION_DIALOG_TAG)
+        dialogHost = host
+        host.start { evaluateNotification(viewModel.uiState.value.notification) }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -141,13 +137,24 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         }
     }
 
+    /**
+     * Viewの破棄に合わせて通知ダイアログの監視を終了し、Hostへの参照を解放する。
+     */
     override fun onDestroyView() {
-        dialogRemovalCallbacks?.let(childFragmentManager::unregisterFragmentLifecycleCallbacks)
-        dialogRemovalCallbacks = null
-        pendingNotificationId = null
+        dialogHost?.stop()
+        dialogHost = null
         super.onDestroyView()
     }
 
+    /**
+     * 検索状態に応じて、ローディング・該当なしメッセージ・一覧の表示を更新する。
+     *
+     * 一覧には成功時の検索結果だけを表示し、それ以外の状態では空にする。
+     *
+     * @param binding 表示を更新する検索画面のView Binding
+     * @param adapter 検索結果を一覧へ反映するアダプター
+     * @param content 現在の検索状態
+     */
     private fun render(
         binding: FragmentRepositorySearchBinding,
         adapter: RepositoryListAdapter,
@@ -155,46 +162,23 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
     ) {
         binding.loadingIndicator.isVisible = content is SearchContent.Loading
         binding.emptyResultText.isVisible = content is SearchContent.Empty
-        // 実行中・失敗・未検索では一覧を空にし、前回の結果を残さない。
+
         adapter.submitList((content as? SearchContent.Success)?.items.orEmpty())
     }
 
     /**
-     * ダイアログがFragmentManagerから外れたときに、保留中の通知を再評価する。
+     * ダイアログの表示状況に応じて、通知の表示要求と消費を行う。
      *
-     * 肯定ボタンや`onCancel`の結果は除去より前に届くため、それを合図にすると
-     * まだ表示中だと誤判定する。除去の完了を検知できる`onFragmentDetached`を使う。
+     * 同じ通知が表示中・予約中の場合、または表示要求を発行できた場合に通知を消費する。
+     * 別の通知が表示中・予約中の場合や、表示要求を発行できない場合は保留する。
+     * 保留した通知は、ダイアログの除去後や画面状態の再購読時に再評価する。
+     *
+     * @param notification 表示を検討する通知。nullの場合は表示要求を行わない
      */
-    private fun observeDialogRemoval() {
-        val callbacks =
-            object : FragmentManager.FragmentLifecycleCallbacks() {
-                override fun onFragmentDetached(
-                    fragmentManager: FragmentManager,
-                    fragment: Fragment,
-                ) {
-                    if (fragment !is AlertDialogFragment) return
-                    if (fragment.tag != NOTIFICATION_DIALOG_TAG) return
-
-                    // 除去されたダイアログの通知だけを解除し、別の予約は残す。
-                    if (fragment.notificationId == pendingNotificationId) {
-                        pendingNotificationId = null
-                    }
-                    evaluateNotification(viewModel.uiState.value.notification)
-                }
-            }
-        childFragmentManager.registerFragmentLifecycleCallbacks(callbacks, false)
-        dialogRemovalCallbacks = callbacks
-    }
-
     private fun evaluateNotification(notification: SearchNotification?) {
-        val shownId =
-            (childFragmentManager.findFragmentByTag(NOTIFICATION_DIALOG_TAG) as? AlertDialogFragment)
-                ?.notificationId
-        // 追加が完了したら予約を解除する。
-        if (shownId != null && shownId == pendingNotificationId) pendingNotificationId = null
-
+        val host = dialogHost ?: return
+        val occupiedId = host.occupiedId()
         if (notification == null) return
-        val occupiedId = shownId ?: pendingNotificationId
 
         when {
             // 同じ通知が表示中・予約中なら処理済みとして扱う。
@@ -203,30 +187,23 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
             // 別の通知が表示中・予約中の間は消費しない。除去されたときに再評価する。
             occupiedId != null -> Unit
 
-            else -> showNotification(notification)
+            // 表示を要求できたときだけ消費する。見送った場合は保持したままにする。
+            host.show(
+                id = notification.id,
+                titleRes = notification.titleRes(),
+                messageRes = notification.messageRes(),
+            ) -> viewModel.onNotificationShown(notification.id)
+
+            else -> Unit
         }
     }
 
-    private fun showNotification(notification: SearchNotification) {
-        val issued =
-            AlertDialogFragment.show(
-                fragmentManager = childFragmentManager,
-                tag = NOTIFICATION_DIALOG_TAG,
-                titleRes = notification.titleRes(),
-                messageRes = notification.messageRes(),
-                notificationId = notification.id,
-            )
-        // 表示を要求できたときだけ消費する。状態保存後などで見送った場合は保持したままにする。
-        if (!issued) return
-
-        pendingNotificationId = notification.id
-        viewModel.onNotificationShown(notification.id)
-    }
-
     /**
-     * 詳細画面へ遷移する。
+     * 選択したリポジトリと検索結果の取得日時を渡し、詳細画面へ遷移する。
      *
-     * 表示中の一覧を取得した時刻も渡し、後続の検索が完了しても変わらないようにする。
+     * 検索が成功した状態で、現在表示中の画面が検索画面の場合にのみ遷移する。
+     *
+     * @param item 一覧で選択されたリポジトリ
      */
     private fun navigateToRepositoryDetail(item: RepositoryItem) {
         val content = viewModel.uiState.value.content
