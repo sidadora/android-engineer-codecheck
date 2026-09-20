@@ -110,7 +110,7 @@ jobs:
   # バージョン比較とタグ操作は.github/scripts/に分離する。
   tag:
     name: tag
-    needs: [ build, ktlint ]
+    needs: [ build, ktlint, unit-test ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
