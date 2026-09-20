@@ -18,6 +18,7 @@ import jp.co.yumemi.android.code_check.R
 import jp.co.yumemi.android.code_check.data.FailureReason
 import jp.co.yumemi.android.code_check.databinding.FragmentRepositoryDetailBinding
 import jp.co.yumemi.android.code_check.ui.common.NotificationDialogHost
+import jp.co.yumemi.android.code_check.ui.common.NotificationDialogHost.Request
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -40,6 +41,9 @@ private fun FailureReason.messageRes(): Int =
         // 他の理由は利用者が取れる行動が変わらないため、共通の案内にする。
         else -> R.string.detail_watchers_failure_message
     }
+
+/** 通知を[NotificationDialogHost]へ渡す形へ変換する。 */
+private fun DetailNotification.toRequest(): Request = Request(id, R.string.detail_error_title, reason.messageRes())
 
 /**
  * 検索結果で選択したリポジトリの詳細を表示する画面。
@@ -145,34 +149,16 @@ class RepositoryDetailFragment : Fragment(R.layout.fragment_repository_detail) {
         }
 
     /**
-     * ダイアログの表示状況に応じて、通知の表示要求と消費を行う。
+     * 通知をHostの形へ変換し、表示要求と消費の判断を委ねる。
      *
-     * 同じ通知が表示中・予約中の場合、または表示要求を発行できた場合に通知を消費する。
-     * 別の通知が表示中・予約中の場合や、表示要求を発行できない場合は保留する。
-     * 保留した通知は、ダイアログの除去後や画面状態の再購読時に再評価する。
+     * 表示状況の判定はHostが持つため、ここでは文字列リソースの選択だけを行う。
      *
-     * @param notification 表示を検討する通知。nullの場合は表示要求を行わない
+     * @param notification 表示を検討する通知。nullの場合もHostへ渡し、確定した予約を解除させる
      */
     private fun evaluateNotification(notification: DetailNotification?) {
-        val host = dialogHost ?: return
-        val occupiedId = host.occupiedId()
-        if (notification == null) return
-
-        when {
-            // 同じ通知が表示中・予約中なら処理済みとして扱う。
-            occupiedId == notification.id -> viewModel.onNotificationShown(notification.id)
-
-            // 別の通知が表示中・予約中の間は消費しない。除去されたときに再評価する。
-            occupiedId != null -> Unit
-
-            // 表示を要求できたときだけ消費する。見送った場合は保持したままにする。
-            host.show(
-                id = notification.id,
-                titleRes = R.string.detail_error_title,
-                messageRes = notification.reason.messageRes(),
-            ) -> viewModel.onNotificationShown(notification.id)
-
-            else -> Unit
-        }
+        dialogHost?.evaluate(
+            request = notification?.toRequest(),
+            onShown = viewModel::onNotificationShown,
+        )
     }
 }
