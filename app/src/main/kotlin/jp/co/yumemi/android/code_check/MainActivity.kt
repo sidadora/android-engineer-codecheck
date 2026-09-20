@@ -8,8 +8,6 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import jp.co.yumemi.android.code_check.ui.search.RepositorySearchViewModel
-import java.util.Date
 
 /**
  * 起動時に表示されるActivity。
@@ -28,14 +26,5 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
             view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
-    }
-
-    companion object {
-        /**
-         * 最後に検索結果の変換が完了した日時。
-         *
-         * [RepositorySearchViewModel.searchRepositories]が更新する。
-         */
-        var lastSearchDate: Date? = null
     }
 }

@@ -17,9 +17,57 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 private const val TAG = "AlertDialog"
 
 /**
- * 結果を通知するダイアログ
+ * 必須の文字列リソースIDを取得し、0でないことを確認する。
+ *
+ * リソースの存在や種類までは検証しない。
+ *
+ * @param key リソースIDを格納したキー
+ * @return 0以外のリソースID
+ * @throws IllegalArgumentException 取得したIDが0の場合。キーの欠落も含む
+ */
+@StringRes
+private fun Bundle.requireStringRes(key: String): Int {
+    val resourceId = getInt(key, 0)
+    require(resourceId != 0) { "ダイアログの$key が設定されていません" }
+    return resourceId
+}
+
+/**
+ * 必須キーの存在を確認し、Boolean値を取得する。
+ *
+ * @param key Boolean値を格納したキー
+ * @return 指定キーから読み出した値
+ * @throws IllegalArgumentException キーが存在しない場合
+ */
+private fun Bundle.requireBoolean(key: String): Boolean {
+    require(containsKey(key)) { "ダイアログの$key が設定されていません" }
+    return getBoolean(key)
+}
+
+/**
+ * 任意の文字列リソースIDを取得する。
+ *
+ * @param key リソースIDを格納したキー
+ * @return キーがなければnull、指定されていれば0以外のリソースID
+ * @throws IllegalArgumentException キーが存在するが、取得したIDが0の場合
+ */
+@StringRes
+private fun Bundle.optionalStringRes(key: String): Int? {
+    if (!containsKey(key)) return null
+    return requireStringRes(key)
+}
+
+/**
+ * タイトル・本文・ボタンを引数で受け取り、通知を表示するダイアログ。
+ *
+ * requestKeyが指定されている場合は、ボタン操作とキャンセルをFragment Resultで通知する。
+ * [notificationId]は引数に保持し、復元後も表示対象の通知を識別できる。
  */
 class AlertDialogFragment : DialogFragment() {
+    /** この表示が対応する通知の識別子。通知を伴わない用途ではnull。 */
+    val notificationId: String?
+        get() = arguments?.getString(KEY_NOTIFICATION_ID)
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val args = requireArguments()
         isCancelable = args.requireBoolean(KEY_CANCELABLE)
@@ -50,7 +98,13 @@ class AlertDialogFragment : DialogFragment() {
 
     private fun sendResult(result: String) {
         val requestKey = requireArguments().getString(KEY_REQUEST_KEY) ?: return
-        setFragmentResult(requestKey, Bundle().apply { putString(KEY_RESULT, result) })
+        setFragmentResult(
+            requestKey,
+            Bundle().apply {
+                putString(KEY_RESULT, result)
+                putString(KEY_NOTIFICATION_ID, notificationId)
+            },
+        )
     }
 
     companion object {
@@ -61,6 +115,9 @@ class AlertDialogFragment : DialogFragment() {
         /** 操作結果（RESULT_*）を格納するBundleのキー。 */
         const val KEY_RESULT = "result"
 
+        /** 対応する通知の識別子を格納するBundleのキー。 */
+        const val KEY_NOTIFICATION_ID = "notificationId"
+
         private const val KEY_TITLE = "title"
         private const val KEY_MESSAGE = "message"
         private const val KEY_POSITIVE_BUTTON = "positiveButton"
@@ -69,13 +126,22 @@ class AlertDialogFragment : DialogFragment() {
         private const val KEY_REQUEST_KEY = "requestKey"
 
         /**
-         * 同じFragmentManagerに同じタグがなければ、同期的に表示する。
+         * 同じタグのFragmentが存在せず、状態保存前の場合にダイアログの表示を要求する。
          *
-         * 接続済みで、トランザクション実行中でないFragmentManagerから呼ぶこと。
-         * 状態保存後の要求は破棄するため、表示の延期・再送が不要な通知に使う。
+         * メインスレッドから呼ぶこと。
+         * 追加は非同期のため、呼び出し元は追加が反映されるまでの重複要求を防ぐこと。
          *
-         * @param negativeButtonRes nullなら否定ボタンを表示しない
-         * @param requestKey nullなら操作結果を通知しない
+         * @param fragmentManager ダイアログを追加するFragmentManager
+         * @param tag 表示するダイアログを識別するタグ
+         * @param titleRes タイトルの文字列リソースID
+         * @param messageRes 本文の文字列リソースID
+         * @param positiveButtonRes 肯定ボタンの文字列リソースID。既定はOK
+         * @param negativeButtonRes 否定ボタンの文字列リソースID。nullの場合は表示しない
+         * @param cancelable 戻る操作などによるキャンセルを許可するか
+         * @param requestKey 操作結果を通知するFragment Resultのキー。nullの場合は通知しない
+         * @param notificationId 表示対象の通知ID。識別が不要な場合はnull
+         * @return 表示要求を発行した場合はtrue。状態保存後、または同じタグのFragmentが
+         *   存在する場合はfalse。trueは表示完了を意味しない
          */
         @MainThread
         fun show(
@@ -87,12 +153,13 @@ class AlertDialogFragment : DialogFragment() {
             @StringRes negativeButtonRes: Int? = null,
             cancelable: Boolean = true,
             requestKey: String? = null,
-        ) {
+            notificationId: String? = null,
+        ): Boolean {
             if (fragmentManager.isStateSaved) {
-                Log.d(TAG, "状態保存後のため表示要求を破棄した: $tag")
-                return
+                Log.d(TAG, "状態保存後のため表示要求を見送った: $tag")
+                return false
             }
-            if (fragmentManager.findFragmentByTag(tag) != null) return
+            if (fragmentManager.findFragmentByTag(tag) != null) return false
 
             val dialogArguments =
                 Bundle().apply {
@@ -101,6 +168,7 @@ class AlertDialogFragment : DialogFragment() {
                     putInt(KEY_POSITIVE_BUTTON, positiveButtonRes)
                     putBoolean(KEY_CANCELABLE, cancelable)
                     putString(KEY_REQUEST_KEY, requestKey)
+                    putString(KEY_NOTIFICATION_ID, notificationId)
                 }
             if (negativeButtonRes != null) {
                 dialogArguments.putInt(KEY_NEGATIVE_BUTTON, negativeButtonRes)
@@ -108,26 +176,10 @@ class AlertDialogFragment : DialogFragment() {
 
             val dialog = AlertDialogFragment()
             dialog.arguments = dialogArguments
-            dialog.showNow(fragmentManager, tag)
+
+            // 呼び出し元でトランザクションが実行中の場合もあるため、追加は非同期で要求する。
+            dialog.show(fragmentManager, tag)
+            return true
         }
     }
-}
-
-/** 必須IDの欠落・0は設定不備として扱う。 */
-@StringRes
-private fun Bundle.requireStringRes(key: String): Int {
-    val resourceId = getInt(key, 0)
-    require(resourceId != 0) { "ダイアログの$key が設定されていません" }
-    return resourceId
-}
-
-private fun Bundle.requireBoolean(key: String): Boolean {
-    require(containsKey(key)) { "ダイアログの$key が設定されていません" }
-    return getBoolean(key)
-}
-
-@StringRes
-private fun Bundle.optionalStringRes(key: String): Int? {
-    if (!containsKey(key)) return null
-    return requireStringRes(key)
 }
