@@ -11,8 +11,9 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import jp.co.yumemi.android.code_check.data.DefaultGitHubRepository
 import jp.co.yumemi.android.code_check.data.GitHubApi
-import jp.co.yumemi.android.code_check.data.GitHubRepository
+import jp.co.yumemi.android.code_check.data.RepositoryDetailDataSource
 import jp.co.yumemi.android.code_check.data.RepositoryResponseParser
+import jp.co.yumemi.android.code_check.data.RepositorySearchDataSource
 import okhttp3.OkHttpClient
 import okhttp3.tls.HandshakeCertificates
 import java.security.cert.CertificateFactory
@@ -36,13 +37,19 @@ class CodeCheckApplication :
      */
     private val httpClient: HttpClient by lazy { HttpClient(Android) }
 
-    /** 画面が使うデータ取得の窓口。アプリ内で共有する。 */
-    val gitHubRepository: GitHubRepository by lazy {
+    /** アプリ内で1つだけ生成し、用途ごとの窓口から共有する。 */
+    private val gitHubRepository: DefaultGitHubRepository by lazy {
         DefaultGitHubRepository(
             api = GitHubApi(httpClient),
             parser = RepositoryResponseParser(),
         )
     }
+
+    /** 検索画面が使うデータ取得の窓口。 */
+    val repositorySearchDataSource: RepositorySearchDataSource get() = gitHubRepository
+
+    /** 詳細画面が使うデータ取得の窓口。 */
+    val repositoryDetailDataSource: RepositoryDetailDataSource get() = gitHubRepository
 
     override fun newImageLoader(): ImageLoader =
         ImageLoader

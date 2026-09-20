@@ -14,7 +14,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import jp.co.yumemi.android.code_check.CodeCheckApplication
 import jp.co.yumemi.android.code_check.data.FailureReason
 import jp.co.yumemi.android.code_check.data.FetchResult
-import jp.co.yumemi.android.code_check.data.GitHubRepository
+import jp.co.yumemi.android.code_check.data.RepositoryDetailDataSource
 import jp.co.yumemi.android.code_check.model.RepositoryItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +39,7 @@ private const val KEY_REPOSITORY_ITEM = "repositoryItem"
  * @property repository 購読者数の取得先
  */
 class RepositoryDetailViewModel(
-    private val repository: GitHubRepository,
+    private val repository: RepositoryDetailDataSource,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DetailUiState())
@@ -105,7 +105,7 @@ class RepositoryDetailViewModel(
                         this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                             as CodeCheckApplication
                     RepositoryDetailViewModel(
-                        repository = application.gitHubRepository,
+                        repository = application.repositoryDetailDataSource,
                         savedStateHandle = createSavedStateHandle(),
                     )
                 }
