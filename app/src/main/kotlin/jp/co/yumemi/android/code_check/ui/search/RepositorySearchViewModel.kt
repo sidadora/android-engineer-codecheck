@@ -169,7 +169,7 @@ class RepositorySearchViewModel(
                 initializer {
                     val application =
                         this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
-                                as CodeCheckApplication
+                            as CodeCheckApplication
                     RepositorySearchViewModel(
                         repository = application.gitHubRepository,
                         savedStateHandle = createSavedStateHandle(),
