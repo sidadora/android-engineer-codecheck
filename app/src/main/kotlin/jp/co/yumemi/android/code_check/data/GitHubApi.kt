@@ -14,6 +14,8 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import java.io.IOException
 
 private const val TAG = "GitHubApi"
@@ -52,7 +54,8 @@ private fun HttpResponse.isRateLimited(): Boolean {
 /**
  * GitHub APIへ通信し、成功時のレスポンス本文または失敗理由を返す。
  *
- * 本文の解析は行わず、キャンセルは呼び出し元へ伝播させる。
+ * 本文の解析は行わない。通信中はキャンセルを受け付けず、
+ * 完了してから呼び出し元へキャンセルが伝わる。
  *
  * @property httpClient 通信に使うクライアント。生成側が寿命を管理し、
  *   HTTPエラーをステータスで判定できる設定にする
@@ -88,7 +91,8 @@ class GitHubApi(
     /**
      * GETリクエストを送り、レスポンス本文または失敗理由を返す。
      *
-     * IOExceptionは通信失敗へ変換し、キャンセルやその他の例外は伝播させる。
+     * IOExceptionは通信失敗へ変換し、その他の例外は伝播させる。
+     * キャンセル要求は本文を読み終えるまで受け付けない。
      *
      * @param url リクエスト先のURL
      * @param configure クエリパラメータなど、リクエスト固有の設定
@@ -98,23 +102,25 @@ class GitHubApi(
         url: String,
         configure: HttpRequestBuilder.() -> Unit,
     ): FetchResult<String> =
-        try {
-            val response =
-                httpClient.get(url) {
-                    header(HttpHeaders.Accept, ACCEPT_GITHUB_JSON)
-                    configure()
-                }
+        withContext(NonCancellable) {
+            try {
+                val response =
+                    httpClient.get(url) {
+                        header(HttpHeaders.Accept, ACCEPT_GITHUB_JSON)
+                        configure()
+                    }
 
-            // HTTPエラーを例外化しないクライアント設定を前提に、ステータスで成否を判定する。
-            if (response.status.isSuccess()) {
-                FetchResult.Success(response.body<String>())
-            } else {
-                Log.w(TAG, "APIがエラーを返しました: ${response.status}")
-                FetchResult.Failure(response.toFailureReason())
+                // HTTPエラーを例外化しないクライアント設定を前提に、ステータスで成否を判定する。
+                if (response.status.isSuccess()) {
+                    FetchResult.Success(response.body<String>())
+                } else {
+                    Log.w(TAG, "APIがエラーを返しました: ${response.status}")
+                    FetchResult.Failure(response.toFailureReason())
+                }
+            } catch (e: IOException) {
+                // 例外メッセージにはURLが含まれ、URLには検索条件が入る。種別だけを記録する。
+                Log.w(TAG, "通信に失敗しました: ${e::class.java.simpleName}")
+                FetchResult.Failure(FailureReason.NETWORK)
             }
-        } catch (e: IOException) {
-            // 例外メッセージにはURLが含まれ、URLには検索条件が入る。種別だけを記録する。
-            Log.w(TAG, "通信に失敗しました: ${e::class.java.simpleName}")
-            FetchResult.Failure(FailureReason.NETWORK)
         }
 }

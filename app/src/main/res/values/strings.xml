@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Android Engineer CodeCheck</string>
     <string name="search_hint_text">GitHub のリポジトリを検索できるよー</string>
+    <string name="search_screen_title">リポジトリ検索</string>
     <string name="repository_language_format">Written in %s</string>
     <string name="repository_language_unknown">Language not specified</string>
     <string name="repository_stars_format">Stars: %1$d</string>

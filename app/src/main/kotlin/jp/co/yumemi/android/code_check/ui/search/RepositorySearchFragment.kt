@@ -202,6 +202,7 @@ class RepositorySearchFragment : Fragment(R.layout.fragment_repository_search) {
         val action =
             RepositorySearchFragmentDirections
                 .actionRepositorySearchFragmentToRepositoryDetailFragment(
+                    repositoryFullName = item.fullName,
                     repositoryItem = item,
                     searchedAtMillis = content.searchedAtMillis,
                 )
