@@ -12,8 +12,8 @@ android {
         applicationId "jp.co.yumemi.android.codecheck"
         minSdk 23
         targetSdk 37
-        versionCode 16
-        versionName "1.1.14"
+        versionCode 17
+        versionName "1.1.15"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -21,6 +21,7 @@ android {
     buildTypes {
         release {
             minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -70,6 +71,10 @@ dependencies {
     implementation 'androidx.navigation:navigation-ui-ktx:2.9.8'
 
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+
+    // テストで固定レスポンスを返すktor-client-mockと同じバージョンが必要なため、
+    // 検証済みの3.5.2で固定する。更新する場合は両方を同時に上げる。
+    // noinspection NewerVersionAvailable
     implementation 'io.ktor:ktor-client-android:3.5.2'
 
     implementation 'io.coil-kt:coil:2.7.0'
@@ -84,7 +89,7 @@ dependencies {
     testImplementation 'org.json:json:20260814'
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0'
     // HTTPステータスとヘッダーの分類を固定レスポンスで検証する。Ktor本体と揃える。
-    //noinspection NewerVersionAvailable
+    // noinspection NewerVersionAvailable
     testImplementation 'io.ktor:ktor-client-mock:3.5.2'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
