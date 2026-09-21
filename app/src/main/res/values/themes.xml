@@ -1,6 +1,6 @@
 <resources>
     <!-- アプリ共通のテーマ。夜間用の配色は values-night/themes.xml に定義。 -->
-    <style name="Theme.AndroidEngineerCodeCheck" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <style name="Theme.AndroidEngineerCodeCheck" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- 基本の配色と、各色の上に表示する文字・アイコンの色。 -->
         <item name="colorPrimary">@color/purple_500</item>
         <item name="colorPrimaryVariant">@color/purple_700</item>
