@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12以降のクラウドバックアップと端末間転送の対象を定める。
+    このアプリが保存するのはCoilの画像キャッシュ（cache配下・既定で対象外）だけで、
+    復元して意味を持つデータがないため、内部ストレージを対象外にする。
+
+    rootは配下のfiles・databases・shared_prefsを含まないため、ドメインごとに指定する。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>
